@@ -1245,6 +1245,28 @@
   // 설계 원칙: AI는 추천만, 결정은 사람. 자동 배치/삭제 금지.
   let suggestMin = 15;
   const GAP_OPTS = [5,10,15,30,60];
+  // 추천 점수: 틈 적합도 + 마감 긴급도 + 우선순위 가중 합
+  function daysUntil(due){ if(!due) return null; return Math.round((parseDS(due)-parseDS(todayStr()))/86400000); }
+  function urgencyScore(t){
+    const d=daysUntil(t.due);
+    if(d==null) return 0.1;
+    if(d<0) return 1.0; if(d===0) return 0.9; if(d===1) return 0.7;
+    if(d<=3) return 0.55; if(d<=7) return 0.35; return 0.15;
+  }
+  function prioScore(t){ return ({1:1,2:0.75,3:0.5,4:0.3})[t.priority]||0.3; }
+  function fitScore(t,gap){ return t.estimate ? Math.min(1, t.estimate/gap) : 0.45; } // 미입력=중립
+  function suggestScore(t,gap){
+    const score = 0.38*prioScore(t) + 0.37*urgencyScore(t) + 0.25*fitScore(t,gap);
+    const d=daysUntil(t.due);
+    let reason;
+    if(d!=null&&d<0) reason='지난 마감';
+    else if(d===0) reason='오늘 마감';
+    else if(t.priority<=2) reason='높은 우선순위';
+    else if(t.estimate&&t.estimate/gap>=0.7) reason='딱 맞는 시간';
+    else if(d!=null&&d<=3) reason='마감 임박';
+    else reason='틈에 적합';
+    return {score,reason};
+  }
   function renderSuggest(){
     $('#viewTitle').textContent='지금 이 틈';
     $('#viewSub').textContent='지금 가진 시간으로 할 수 있는 가장 좋은 일';
@@ -1265,13 +1287,16 @@
     custom.onchange=()=>{ const v=+custom.value; if(v>0){ suggestMin=v; renderSuggest(); } };
     chips.appendChild(custom);
 
-    const cands=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(!t.estimate||t.estimate<=suggestMin))).slice(0,6);
+    const cands=state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(!t.estimate||t.estimate<=suggestMin))
+      .map(t=>({t,...suggestScore(t,suggestMin)}))
+      .sort((a,b)=> b.score-a.score || (a.t.createdAt-b.t.createdAt))
+      .slice(0,6);
     const list=wrap.querySelector('#sgList');
     if(!cands.length){
       list.appendChild(el(`<div class="empty"><div class="big">🍃</div>이 틈에 딱 맞는 일이 없어요.<br>큰 일을 더 잘게 나누거나, 소요 시간을 입력해 보세요.</div>`));
       return;
     }
-    cands.forEach((t,i)=>{
+    cands.forEach(({t,reason},i)=>{
       const card=el(`<div class="sg-card ${i===0?'top':''}">
         <span class="sg-rank">${i===0?'★':i+1}</span>
         <div class="sg-body"><div class="sg-title">${esc(t.title)}</div><div class="sg-meta"></div></div>
@@ -1282,7 +1307,9 @@
         </div>
       </div>`);
       const meta=card.querySelector('.sg-meta');
+      meta.appendChild(el(`<span class="chip why">💡 ${reason}</span>`));
       if(t.estimate) meta.appendChild(el(`<span class="chip">⏱ ${t.estimate}분</span>`));
+      else meta.appendChild(el(`<span class="chip" style="color:var(--muted)">⏱ 소요 미정</span>`));
       if(t.priority<=3) meta.appendChild(el(`<span class="chip" style="color:var(--p${t.priority})">P${t.priority}</span>`));
       if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">📅 ${fmtDue(t.due)}</span>`)); }
       if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip">${esc(p.name)}</span>`)); }
