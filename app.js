@@ -5,6 +5,12 @@
   // ---------- State ----------
   const LS_KEY = 'flowdo.state.v1';
   const CFG_KEY = 'flowdo.cloud.v1';
+  // 공용 백엔드: anon(publishable) 키는 클라이언트 공개용이며 데이터 보호는 RLS가 담당.
+  // 모든 방문자가 별도 설정 없이 같은 백엔드로 Google 로그인 → 자동 동기화.
+  const DEFAULT_CLOUD = {
+    url: 'https://btmyvomigijtikajaazv.supabase.co',
+    key: 'sb_publishable_PCfTgna_8CzZBS3F_Gi9AA_y5P-hFUn'
+  };
   const PROJECT_COLORS = ['#4f46e5','#16a34a','#e5484d','#f76808','#0091ff','#9333ea','#0d9488','#db2777'];
 
   let state = load();
@@ -64,7 +70,9 @@
     return s;
   }
   function loadCfg(){
-    try{ return JSON.parse(localStorage.getItem(CFG_KEY))||{}; }catch(e){ return {}; }
+    // 내장 기본값(공용 백엔드)에 로컬 오버라이드(스페이스 ID 등)를 병합.
+    let saved={}; try{ saved=JSON.parse(localStorage.getItem(CFG_KEY))||{}; }catch(e){}
+    return Object.assign({}, DEFAULT_CLOUD, saved);
   }
   function save(){
     state.updatedAt = Date.now();
@@ -1031,44 +1039,13 @@
     $('#viewSub').textContent='클라우드 동기화 · 데이터';
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='settings'));
     content.innerHTML='';
-    const synced=!!(cloud.url&&cloud.key&&syncKey());
-    const hasCfg=!!(cloud.url&&cloud.key);
-    const authBox = !hasCfg ? `<div class="note">먼저 위 연결을 저장하면 Google 로그인을 쓸 수 있습니다.</div>`
-      : authUser ? `<div class="row" style="align-items:center"><div class="note" style="flex:1">✅ Google 로그인됨: <b>${esc(authUser.email||'계정')}</b><br>이 계정으로 모든 기기가 자동 동기화됩니다.</div><button class="btn" id="cf-logout">로그아웃</button></div>`
-      : `<button class="btn primary" id="cf-google">🔑 Google 계정으로 로그인</button>`;
+    const authBox = authUser
+      ? `<div class="row" style="align-items:center"><div class="note" style="flex:1">✅ Google 로그인됨: <b>${esc(authUser.email||'계정')}</b><br>이 계정으로 모든 기기가 자동 동기화됩니다.</div><button class="btn" id="cf-logout">로그아웃</button></div>`
+      : `<button class="btn primary" id="cf-google">🔑 Google 계정으로 로그인</button><div class="note">로그인하면 어느 기기에서든 같은 데이터가 자동으로 동기화됩니다.</div>`;
     const box=el(`<div style="max-width:640px;display:flex;flex-direction:column;gap:18px">
       <div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
-        <strong>👤 Google 계정 로그인 (기기 간 자동 동기화)</strong>
-        <div class="note">로그인하면 어느 기기에서든 본인 계정으로 같은 데이터를 사용합니다. 스페이스 ID를 직접 관리할 필요가 없습니다. (HTTPS로 호스팅된 주소에서만 동작)</div>
+        <strong>👤 계정</strong>
         ${authBox}
-      </div>
-
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
-        <strong>☁️ Supabase 연결</strong>
-        <div class="note">Google 로그인·동기화의 백엔드입니다. URL/Key는 필수, 스페이스 ID는 로그인 대신 수동 동기화를 쓸 때만 입력합니다.</div>
-        <div class="field"><label>Supabase Project URL</label><input id="cf-url" placeholder="https://xxxx.supabase.co" value="${esc(cloud.url||'')}"></div>
-        <div class="field"><label>anon public key</label><input id="cf-key" placeholder="eyJhbGci..." value="${esc(cloud.key||'')}"></div>
-        <div class="field"><label>스페이스 ID (선택 — 로그인 안 쓸 때)</label><input id="cf-space" placeholder="eden-private-2026" value="${esc(cloud.space||'')}"></div>
-        <div class="row">
-          <button class="btn primary" id="cf-save">연결 저장</button>
-          <button class="btn" id="cf-pull">서버에서 불러오기</button>
-          <button class="btn" id="cf-push">서버로 올리기</button>
-        </div>
-        <div class="note" id="cf-status">상태: ${synced?'<b style="color:var(--green)">연결됨</b>':'로컬 전용'}</div>
-      </div>
-
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
-        <strong>🗄️ 최초 1회 — Supabase 테이블 생성 SQL</strong>
-        <div class="note">Supabase 대시보드 → SQL Editor에 붙여넣고 실행하세요.</div>
-        <pre>create table if not exists flowdo (
-  id text primary key,
-  data jsonb,
-  updated_at bigint
-);
-alter table flowdo enable row level security;
-create policy "rw" on flowdo
-  for all to anon, authenticated using (true) with check (true);</pre>
-        <div class="note">Google 로그인 설정: Supabase 대시보드 → Authentication → Providers → Google 활성화 후, Google Cloud Console에서 OAuth 클라이언트를 만들어 Client ID/Secret을 입력하고, 승인된 리디렉션 URI에 Supabase가 안내하는 콜백 주소를 등록하세요. 자세한 단계는 README를 참고하세요.</div>
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
@@ -1094,13 +1071,6 @@ create policy "rw" on flowdo
     </div>`);
     content.appendChild(box);
 
-    box.querySelector('#cf-save').onclick=()=>{
-      cloud={url:$('#cf-url').value.trim(),key:$('#cf-key').value.trim(),space:$('#cf-space').value.trim()};
-      localStorage.setItem(CFG_KEY,JSON.stringify(cloud)); initSupa();
-      updateSyncBadge(); $('#cf-status').innerHTML='상태: <b style="color:var(--green)">저장됨 · 연결 시도</b>';
-    };
-    box.querySelector('#cf-pull').onclick=()=>cloudPull(true);
-    box.querySelector('#cf-push').onclick=()=>cloudPush(true);
     if(box.querySelector('#cf-google')) box.querySelector('#cf-google').onclick=googleLogin;
     if(box.querySelector('#cf-logout')) box.querySelector('#cf-logout').onclick=googleLogout;
     box.querySelector('#exp').onclick=exportJson;
