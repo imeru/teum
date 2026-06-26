@@ -1,0 +1,13 @@
+{
+  "name": "teum",
+  "version": "1.0.0",
+  "description": "틈(TEUM) — 의도적 시간관리 PWA",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
