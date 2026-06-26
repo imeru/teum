@@ -22,6 +22,7 @@
   let projColor = PROJECT_COLORS[0];
   let supa = null;          // supabase client
   let syncTimer = null;
+  let lastSyncSig = '';     // 마지막으로 서버에 올린 내용 시그니처(중복 업로드 방지)
   let authUser = null;      // 로그인된 Google 계정
   let authChecked = false;  // 세션 확인 완료 여부 (게이트 로딩 표시용)
   let deferredInstall = null; // PWA 설치 프롬프트 (Chromium 계열)
@@ -1634,12 +1635,17 @@
     clearTimeout(syncTimer);
     syncTimer=setTimeout(()=>cloudPush(false),1200);
   }
+  // 내용 시그니처(휘발성 updatedAt 제외) — 실제 변경이 없으면 업로드를 건너뛰기 위함
+  function syncSig(){ const c=Object.assign({},state); delete c.updatedAt; return JSON.stringify(c); }
   async function cloudPush(manual){
     if(!supa||!syncKey()){ if(manual) alert('먼저 연결(또는 로그인)을 설정하세요.'); return; }
+    const sig=syncSig();
+    if(!manual && sig===lastSyncSig) return; // 내용 변화 없으면 네트워크 생략
     try{
       const payload={id:syncKey(),data:state,updated_at:state.updatedAt};
       const {error}=await supa.from('flowdo').upsert(payload);
       if(error) throw error;
+      lastSyncSig=sig;
       if(manual) toast('서버로 올렸습니다.');
     }catch(err){ console.warn(err); if(manual) alert('업로드 실패: '+(err.message||err)); }
   }
@@ -1650,7 +1656,9 @@
       if(error) throw error;
       if(data&&data.data){
         if(manual || data.updated_at>(state.updatedAt||0)){
-          state=migrate(data.data); localStorage.setItem(LS_KEY,JSON.stringify(state)); render();
+          state=migrate(data.data); localStorage.setItem(LS_KEY,JSON.stringify(state));
+          lastSyncSig=syncSig(); // 방금 받은 내용은 다시 올리지 않도록 시그니처 갱신
+          render();
           if(manual) toast('서버에서 불러왔습니다.');
         }
       } else if(manual){ toast('서버에 데이터가 없어 현재 내용을 올립니다.'); cloudPush(true); }
