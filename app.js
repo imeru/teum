@@ -84,6 +84,11 @@
   // ---------- Date helpers ----------
   function todayStr(d=new Date()){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
   function pad(n){ return String(n).padStart(2,'0'); }
+  function parseDS(ds){ return new Date(ds+'T00:00:00'); }
+  function addDaysDS(ds,n){ const d=parseDS(ds); d.setDate(d.getDate()+n); return todayStr(d); }
+  function addMonthsDS(ds,n){ const d=parseDS(ds); d.setMonth(d.getMonth()+n); return todayStr(d); }
+  function startOfWeekDS(ds){ const d=parseDS(ds); d.setDate(d.getDate()-d.getDay()); return todayStr(d); } // 일요일 시작
+  const DOW='일월화수목금토';
   function fmtDue(s){
     if(!s) return '';
     const d=new Date(s+'T00:00:00'), t=new Date(todayStr()+'T00:00:00');
@@ -319,12 +324,21 @@
 
   // ---------- Time-box (Plan) view ----------
   let planDate = todayStr();
+  let planView = (function(){ const v=localStorage.getItem('flowdo.planview'); return (v==='week'||v==='month')?v:'day'; })();
   let planTimer = null;
+  function setPlanView(v){ planView=v; localStorage.setItem('flowdo.planview',v); renderPlan(); }
+  function planNav(dir){ // dir: -1 이전 / +1 다음
+    if(planView==='month') planDate=addMonthsDS(planDate.slice(0,8)+'01', dir);
+    else if(planView==='week') planDate=addDaysDS(planDate, dir*7);
+    else planDate=addDaysDS(planDate, dir);
+    miniMonth=planDate.slice(0,8)+'01'; renderPlan();
+  }
 
   function renderPlan(){
     $('#viewTitle').textContent='타임박스';
     $('#viewSub').textContent='왼쪽 할 일을 오른쪽 시간표로 끌어다 놓아 하루를 설계하세요';
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='plan'));
+    if(planTimer){ clearInterval(planTimer); planTimer=null; }
     content.innerHTML='';
     const wrap=el(`<div class="tb">
       <div class="tb-left">
@@ -347,8 +361,8 @@
         </div>
       </div>
       <div class="tb-right">
-        <div class="tb-week" id="weekStrip"></div>
-        <div class="calendar"><div class="cal-grid" id="calGrid"></div></div>
+        <div class="cal-top" id="calTop"></div>
+        <div class="cal-body" id="calBody"></div>
       </div>
     </div>`);
     content.appendChild(wrap);
@@ -357,11 +371,164 @@
     wrap.querySelector('#addEventBtn').onclick=openEvent;
     renderMiniCal();
     renderTop3();
-    renderWeekStrip();
     renderPool();
     renderEventList();
+    renderCalTop();
+    renderCalBody();
+  }
+
+  // ---- 캘린더 상단: 네비 + 일/주/월 토글 ----
+  function calRangeLabel(){
+    const d=parseDS(planDate);
+    if(planView==='month') return `${d.getFullYear()}년 ${d.getMonth()+1}월`;
+    if(planView==='week'){ const s=parseDS(startOfWeekDS(planDate)); const e=new Date(s); e.setDate(s.getDate()+6);
+      const sameM=s.getMonth()===e.getMonth();
+      return `${s.getMonth()+1}월 ${s.getDate()}일 – ${sameM?'':(e.getMonth()+1)+'월 '}${e.getDate()}일`; }
+    return `${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
+  }
+  function renderCalTop(){
+    const top=$('#calTop'); if(!top) return; top.innerHTML='';
+    const bar=el(`<div class="cal-nav">
+      <button class="iconbtn cal-arrow" id="cal-prev" title="이전">‹</button>
+      <button class="btn sm" id="cal-today">오늘</button>
+      <button class="iconbtn cal-arrow" id="cal-next" title="다음">›</button>
+      <span class="cal-range">${esc(calRangeLabel())}</span>
+      <div class="seg" role="tablist">
+        <button data-v="day" class="${planView==='day'?'on':''}">일간</button>
+        <button data-v="week" class="${planView==='week'?'on':''}">주간</button>
+        <button data-v="month" class="${planView==='month'?'on':''}">월간</button>
+      </div>
+    </div>`);
+    bar.querySelector('#cal-prev').onclick=()=>planNav(-1);
+    bar.querySelector('#cal-next').onclick=()=>planNav(1);
+    bar.querySelector('#cal-today').onclick=()=>{ planDate=todayStr(); miniMonth=planDate.slice(0,8)+'01'; renderPlan(); };
+    bar.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setPlanView(b.dataset.v));
+    top.appendChild(bar);
+  }
+  function renderCalBody(){
+    const body=$('#calBody'); if(!body) return; body.innerHTML='';
+    if(planView==='week') renderWeek(body);
+    else if(planView==='month') renderMonth(body);
+    else renderDay(body);
+  }
+  function renderDay(body){
+    body.appendChild(el(`<div class="calendar"><div class="cal-grid" id="calGrid"></div></div>`));
     renderCalendar();
     startNowLine();
+  }
+
+  // ---- 주간 보기: 7열 시간 그리드 ----
+  function renderWeek(body){
+    const ws=startOfWeekDS(planDate);
+    const days=[]; for(let i=0;i<7;i++) days.push(addDaysDS(ws,i));
+    const today=todayStr();
+    const gridH=(CAL_END-CAL_START)*60*PX_PER_MIN;
+    const wk=el(`<div class="wk">
+      <div class="wk-head"><div class="wk-gutter"></div><div class="wk-heads"></div></div>
+      <div class="wk-allday"><div class="wk-gutter">할 일</div><div class="wk-ad-cols"></div></div>
+      <div class="wk-scroll"><div class="wk-grid"><div class="wk-times"></div><div class="wk-cols"></div></div></div>
+    </div>`);
+    const heads=wk.querySelector('.wk-heads'), adcols=wk.querySelector('.wk-ad-cols'),
+          times=wk.querySelector('.wk-times'), cols=wk.querySelector('.wk-cols');
+    // 요일 헤더
+    days.forEach(ds=>{ const d=parseDS(ds);
+      const h=el(`<div class="wk-dh ${ds===today?'today':''} ${ds===planDate?'sel':''}"><span class="dow">${DOW[d.getDay()]}</span><span class="dom">${d.getDate()}</span></div>`);
+      h.onclick=()=>{ planDate=ds; setPlanView('day'); };
+      heads.appendChild(h);
+    });
+    // 상단 "할 일" 줄 — 그날 마감이고 시간 블록이 없는 할 일 칩
+    days.forEach(ds=>{ const col=el(`<div class="wk-ad"></div>`);
+      const items=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&t.due===ds&&!(t.block&&t.block.date===ds)));
+      items.slice(0,4).forEach(t=>{ const pc=t.priority<=3?`p${t.priority}`:'';
+        const chip=el(`<div class="wk-chip ${isOverdue(t.due)?'overdue':''}" draggable="true" title="${esc(t.title)}"><span class="pt-dot ${pc}"></span>${esc(t.title)}</div>`);
+        chip.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);});
+        chip.addEventListener('click',()=>openTask(t.id));
+        col.appendChild(chip);
+      });
+      if(items.length>4) col.appendChild(el(`<div class="wk-more">+${items.length-4}</div>`));
+      makeDayDrop(col,ds);
+      adcols.appendChild(col);
+    });
+    // 시간 눈금
+    for(let h=CAL_START;h<CAL_END;h++) times.appendChild(el(`<div class="wk-tlabel" style="top:${minToTop(h*60)}px">${pad(h)}:00</div>`));
+    // 7개 시간 열
+    cols.style.height=gridH+'px';
+    days.forEach(ds=>{
+      const col=el(`<div class="wk-col ${ds===today?'today':''}" style="height:${gridH}px"></div>`);
+      // 정기 일정
+      (state.events||[]).filter(ev=>eventOccursOn(ev,ds)).forEach(ev=>{
+        const card=el(`<div class="wk-ev" style="top:${minToTop(ev.start)}px;height:${Math.max(SNAP_MIN,ev.duration)*PX_PER_MIN-2}px;border-left-color:${ev.color||'#0d9488'}"><span class="t">${minToHHMM(ev.start)}</span><span class="n">${esc(ev.title)}</span></div>`);
+        card.onclick=()=>openEvent(ev.id); col.appendChild(card);
+      });
+      // 작업 블록
+      state.tasks.filter(t=>t.block&&t.block.date===ds).forEach(t=>{
+        const pc=t.priority<=2?`p${t.priority}`:'';
+        const card=el(`<div class="wk-blk ${pc}" draggable="true" style="top:${minToTop(t.block.start)}px;height:${Math.max(SNAP_MIN,t.block.duration)*PX_PER_MIN-2}px"><span class="t">${minToHHMM(t.block.start)}</span><span class="n">${esc(t.title)}</span></div>`);
+        card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',t.id); const r=card.getBoundingClientRect(); dragOffsetMin=snapMin((e.clientY-r.top)/PX_PER_MIN); });
+        card.addEventListener('dragend',()=>{dragOffsetMin=0;});
+        card.addEventListener('click',()=>openTask(t.id));
+        col.appendChild(card);
+      });
+      // 현재 시각선
+      if(ds===today){ const now=new Date(); const mins=now.getHours()*60+now.getMinutes();
+        if(mins>=CAL_START*60&&mins<CAL_END*60) col.appendChild(el(`<div class="wk-now" style="top:${minToTop(mins)}px"></div>`)); }
+      // 드롭 → 해당 요일·시각에 배치
+      col.addEventListener('dragover',e=>{e.preventDefault();});
+      col.addEventListener('drop',e=>{e.preventDefault();const id=e.dataTransfer.getData('text/plain');if(!id)return;
+        const r=col.getBoundingClientRect();
+        let m=snapMin(CAL_START*60+(e.clientY-r.top)/PX_PER_MIN-dragOffsetMin);
+        m=Math.max(CAL_START*60,Math.min(CAL_END*60-SNAP_MIN,m));
+        scheduleTask(id,m,ds);
+      });
+      cols.appendChild(col);
+    });
+    body.appendChild(wk);
+    // 현재 시각 근처로 스크롤
+    const sc=wk.querySelector('.wk-scroll');
+    const now=new Date(); const mins=now.getHours()*60+now.getMinutes();
+    if(mins>=CAL_START*60&&mins<CAL_END*60) sc.scrollTop=Math.max(0,minToTop(mins)-sc.clientHeight/2);
+  }
+
+  // ---- 월간 보기: 달력 셀 + 할 일 칩 ----
+  function renderMonth(body){
+    const first=parseDS(planDate.slice(0,8)+'01');
+    const y=first.getFullYear(), mo=first.getMonth();
+    const gridStart=parseDS(startOfWeekDS(todayStr(first)));
+    const today=todayStr();
+    const grid=el(`<div class="mo"><div class="mo-dow"></div><div class="mo-grid"></div></div>`);
+    const dowRow=grid.querySelector('.mo-dow'), cells=grid.querySelector('.mo-grid');
+    for(let i=0;i<7;i++) dowRow.appendChild(el(`<div class="mo-dn ${i===0?'sun':''} ${i===6?'sat':''}">${DOW[i]}</div>`));
+    for(let i=0;i<42;i++){
+      const d=new Date(gridStart); d.setDate(gridStart.getDate()+i); const ds=todayStr(d);
+      const out=d.getMonth()!==mo;
+      const cell=el(`<div class="mo-cell ${out?'out':''} ${ds===today?'today':''} ${ds===planDate?'sel':''}">
+        <div class="mo-d">${d.getDate()}</div><div class="mo-items"></div></div>`);
+      const items=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(t.due===ds||(t.block&&t.block.date===ds))));
+      const host=cell.querySelector('.mo-items');
+      items.slice(0,3).forEach(t=>{ const pc=t.priority<=3?`p${t.priority}`:'';
+        const chip=el(`<div class="mo-chip ${isOverdue(t.due)?'overdue':''}" draggable="true" title="${esc(t.title)}"><span class="pt-dot ${pc}"></span>${esc(t.title)}</div>`);
+        chip.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);});
+        chip.addEventListener('click',e=>{e.stopPropagation();openTask(t.id);});
+        host.appendChild(chip);
+      });
+      if(items.length>3) host.appendChild(el(`<div class="mo-more">+${items.length-3}</div>`));
+      const hasEv=(state.events||[]).some(ev=>eventOccursOn(ev,ds));
+      if(hasEv) cell.querySelector('.mo-d').insertAdjacentHTML('afterbegin','<span class="mo-evdot">🔁</span> ');
+      cell.onclick=()=>{ planDate=ds; setPlanView('day'); };
+      makeDayDrop(cell,ds);
+      cells.appendChild(cell);
+    }
+    body.appendChild(grid);
+  }
+
+  // 날짜 칸/칩에 할 일 드롭 → 그날로 마감일(있으면 블록) 이동
+  function makeDayDrop(elem,ds){
+    elem.addEventListener('dragover',e=>{e.preventDefault();elem.classList.add('day-drop');});
+    elem.addEventListener('dragleave',e=>{ if(e.target===elem) elem.classList.remove('day-drop'); });
+    elem.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();elem.classList.remove('day-drop');
+      const id=e.dataTransfer.getData('text/plain'); const t=state.tasks.find(x=>x.id===id); if(!t) return;
+      t.due=ds; if(t.block) t.block.date=ds; t.updatedAt=Date.now(); save(); renderPlan();
+    });
   }
 
   // -- TOP 3 priorities (per day) --
@@ -391,23 +558,6 @@
       slot.addEventListener('dragleave',()=>slot.classList.remove('dragover'));
       slot.addEventListener('drop',e=>{e.preventDefault();slot.classList.remove('dragover');const did=e.dataTransfer.getData('text/plain');if(did)setTop3Slot(i,did);});
       box.appendChild(slot);
-    }
-  }
-
-  // -- Week strip --
-  function renderWeekStrip(){
-    const strip=$('#weekStrip'); strip.innerHTML='';
-    const start=new Date(); start.setHours(0,0,0,0); start.setDate(start.getDate()-1);
-    for(let i=0;i<14;i++){
-      const d=new Date(start); d.setDate(start.getDate()+i); const ds=todayStr(d);
-      const cell=el(`<div class="day-cell ${ds===planDate?'sel':''} ${ds===todayStr()?'today':''}">
-        <div class="dow">${'일월화수목금토'[d.getDay()]}</div>
-        <div class="dom">${d.getDate()}</div>
-      </div>`);
-      cell.onclick=()=>{ planDate=ds; renderPlan(); };
-      cell.addEventListener('dragover',e=>e.preventDefault());
-      cell.addEventListener('drop',e=>{e.preventDefault();const id=e.dataTransfer.getData('text/plain');const t=state.tasks.find(x=>x.id===id);if(t){t.due=ds;if(t.block)t.block.date=ds;t.updatedAt=Date.now();save();}planDate=ds;renderPlan();});
-      strip.appendChild(cell);
     }
   }
 
@@ -559,11 +709,12 @@
     grid.appendChild(line);
   }
 
-  function scheduleTask(id,min){
+  function scheduleTask(id,min,date){
+    date=date||planDate;
     const t=state.tasks.find(x=>x.id===id); if(!t) return;
     const dur=t.block?t.block.duration:(t.estimate||60);
-    t.block={date:planDate,start:min,duration:dur};
-    if(!t.due) t.due=planDate;
+    t.block={date:date,start:min,duration:dur};
+    if(!t.due) t.due=date;
     t.updatedAt=Date.now(); save(); renderPlan();
   }
 
