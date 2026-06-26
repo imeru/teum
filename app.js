@@ -25,6 +25,7 @@
   let lastPushedHash = '';
   let authUser = null;      // 로그인된 Google 계정
   let authChecked = false;  // 세션 확인 완료 여부 (게이트 로딩 표시용)
+  let deferredInstall = null; // PWA 설치 프롬프트 (Chromium 계열)
   function syncKey(){ return authUser ? ('u_'+authUser.id) : (cloud.space||''); }
 
   // Pomodoro runtime (lives across view switches)
@@ -1297,6 +1298,17 @@
     notifyTimer=setInterval(checkReminders, 30000);
   }
 
+  // ---------- PWA 설치 ----------
+  function isStandalone(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true; }
+  function installInstructions(){
+    const ua=navigator.userAgent;
+    if(/iphone|ipad|ipod/i.test(ua)) return 'Safari 하단 공유 버튼(􀈂)을 누르고 "홈 화면에 추가"를 선택하세요.';
+    if(/macintosh|mac os x/i.test(ua) && /safari/i.test(ua) && !/chrome|crios|edg|chromium/i.test(ua))
+      return 'Safari 메뉴 → 파일 → "Dock에 추가…", 또는 주소창 옆 공유 버튼 → "Dock에 추가"를 선택하세요.';
+    if(/android/i.test(ua)) return 'Chrome 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 선택하세요.';
+    return '브라우저 주소창 오른쪽의 설치 아이콘(⊕/모니터 모양)을 누르거나, 메뉴에서 "앱 설치"를 선택하세요.';
+  }
+
   // ---------- 스마트 추천 (지금 이 틈) ----------
   // 설계 원칙: AI는 추천만, 결정은 사람. 자동 배치/삭제 금지.
   let suggestMin = 15;
@@ -1451,6 +1463,12 @@
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
+        <strong>📲 앱으로 설치</strong>
+        <div class="note">홈 화면·독에 설치하면 앱처럼 바로 열리고, 띄워두기 쉬워 알림을 놓치지 않습니다.</div>
+        <div id="install-area"></div>
+      </div>
+
+      <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
         <strong>🔔 알림</strong>
         <div class="note">앱이 켜져 있을 때 타임블록 시작·마감 시간·일정 시작·뽀모도로 종료를 알려줍니다. (앱을 완전히 닫으면 동작하지 않습니다)</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nt-on" style="width:auto" ${state.settings.notify?'checked':''}> 알림 사용</label>
@@ -1488,6 +1506,28 @@
 
     if(box.querySelector('#cf-google')) box.querySelector('#cf-google').onclick=googleLogin;
     if(box.querySelector('#cf-logout')) box.querySelector('#cf-logout').onclick=googleLogout;
+    // 앱 설치
+    const installArea=box.querySelector('#install-area');
+    const renderInstall=()=>{
+      installArea.innerHTML='';
+      if(isStandalone()){ installArea.appendChild(el(`<div class="note">✅ 이미 앱으로 실행 중입니다.</div>`)); return; }
+      if(deferredInstall){
+        const b=el(`<button class="btn primary">📲 앱 설치</button>`);
+        b.onclick=async()=>{
+          try{ deferredInstall.prompt(); const {outcome}=await deferredInstall.userChoice;
+            if(outcome==='accepted'){ deferredInstall=null; toast('설치를 시작했습니다.'); } }
+          catch(_){}
+          renderInstall();
+        };
+        installArea.appendChild(b);
+      } else {
+        const b=el(`<button class="btn">설치 방법 보기</button>`);
+        const guide=el(`<div class="note" style="display:none;margin-top:8px">${esc(installInstructions())}</div>`);
+        b.onclick=()=>{ guide.style.display=guide.style.display==='none'?'':'none'; };
+        installArea.appendChild(b); installArea.appendChild(guide);
+      }
+    };
+    renderInstall();
     box.querySelector('#exp').onclick=exportJson;
     box.querySelector('#imp').onclick=()=>$('#impFile').click();
     box.querySelector('#impFile').onchange=importJson;
@@ -1687,6 +1727,10 @@
   // ---------- Boot ----------
   const gateBtn=document.getElementById('gate-google');
   if(gateBtn) gateBtn.onclick=googleLogin;
+  // PWA 설치 프롬프트 캡처 (Chromium 계열)
+  window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(currentView==='settings') renderSettings(); });
+  window.addEventListener('appinstalled', ()=>{ deferredInstall=null; toast('앱이 설치되었습니다.'); if(currentView==='settings') renderSettings(); });
+
   setView('plan');
   updateAuthGate();
   startReminderLoop();
