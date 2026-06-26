@@ -119,6 +119,7 @@
   // 정기 일정이 특정 날짜(ds)에 발생하는가
   function eventOccursOn(ev,ds){
     if(!ev.startDate) ev.startDate=ds;
+    if(ev.freq==='once'){ const end=ev.endDate||ev.startDate; return ds>=ev.startDate && ds<=end; }
     if(ds<ev.startDate) return false;
     if(ev.endMode==='date'&&ev.endDate&&ds>ev.endDate) return false;
     if(ev.excludeHolidays&&(state.holidays||[]).includes(ds)) return false;
@@ -356,7 +357,7 @@
           <div id="pool"></div>
         </div>
         <div class="tb-card">
-          <div class="tb-h"><span>🔁 정기 일정</span><button class="btn sm" id="addEventBtn">＋ 추가</button></div>
+          <div class="tb-h"><span>📅 일정</span><span style="display:flex;gap:6px"><button class="btn sm" id="addEventBtn">＋ 정기</button><button class="btn sm" id="addEventOnceBtn">＋ 종일·기간</button></span></div>
           <div id="eventList"></div>
         </div>
       </div>
@@ -368,7 +369,8 @@
     content.appendChild(wrap);
     const pq=wrap.querySelector('#poolQuick');
     pq.addEventListener('keydown',e=>{ if(e.key==='Enter'&&pq.value.trim()){ quickAdd(pq.value.trim()); pq.value=''; renderPlan(); } });
-    wrap.querySelector('#addEventBtn').onclick=openEvent;
+    wrap.querySelector('#addEventBtn').onclick=()=>openEvent(null,'weekly');
+    wrap.querySelector('#addEventOnceBtn').onclick=()=>openEvent(null,'once');
     renderMiniCal();
     renderTop3();
     renderPool();
@@ -415,12 +417,21 @@
     CAL_START = dayExpanded ? 0 : 8;
     const wrap=el(`<div class="day-wrap">
       <button class="early-toggle">${dayExpanded?'▴ 새벽 시간 접기 (00–08시)':'▾ 새벽 시간 보기 (00–08시)'}</button>
-      <div class="calendar"><div class="cal-grid" id="calGrid"></div></div>
     </div>`);
     wrap.querySelector('.early-toggle').onclick=()=>{ dayExpanded=!dayExpanded; renderCalBody(); };
+    // 종일·기간 일정 스트립
+    const allday=(state.events||[]).filter(ev=>ev.allDay&&eventOccursOn(ev,planDate));
+    if(allday.length){ const strip=el(`<div class="day-allday"></div>`); allday.forEach(ev=>strip.appendChild(evAllDayChip(ev))); wrap.appendChild(strip); }
+    wrap.appendChild(el(`<div class="calendar"><div class="cal-grid" id="calGrid"></div></div>`));
     body.appendChild(wrap);
     renderCalendar();
     startNowLine();
+  }
+  // 종일/기간 일정 칩 (일·주·월 공용)
+  function evAllDayChip(ev){
+    const chip=el(`<div class="ad-chip" style="background:${ev.color||'#0d9488'}" title="${esc(ev.title)}">${esc(ev.title)}</div>`);
+    chip.addEventListener('click',e=>{e.stopPropagation();openEvent(ev.id);});
+    return chip;
   }
 
   // ---- 주간 보기: 7열 시간 그리드 ----
@@ -447,8 +458,9 @@
       h.onclick=()=>{ planDate=ds; setPlanView('day'); };
       heads.appendChild(h);
     });
-    // 상단 "할 일" 줄 — 그날 마감이고 시간 블록이 없는 할 일 칩
+    // 상단 줄 — 종일·기간 일정 + 그날 마감이고 시간 블록이 없는 할 일 칩
     days.forEach(ds=>{ const col=el(`<div class="wk-ad"></div>`);
+      (state.events||[]).filter(ev=>ev.allDay&&eventOccursOn(ev,ds)).forEach(ev=>col.appendChild(evAllDayChip(ev)));
       const items=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&t.due===ds&&!(t.block&&t.block.date===ds)));
       items.slice(0,4).forEach(t=>{ const pc=t.priority<=3?`p${t.priority}`:'';
         const chip=el(`<div class="wk-chip ${isOverdue(t.due)?'overdue':''}" draggable="true" title="${esc(t.title)}"><span class="pt-dot ${pc}"></span>${esc(t.title)}</div>`);
@@ -466,8 +478,8 @@
     cols.style.height=gridH+'px';
     days.forEach(ds=>{
       const col=el(`<div class="wk-col ${ds===today?'today':''}" style="height:${gridH}px"></div>`);
-      // 정기 일정
-      (state.events||[]).filter(ev=>eventOccursOn(ev,ds)).forEach(ev=>{
+      // 일정 (시간 있는 것만)
+      (state.events||[]).filter(ev=>!ev.allDay&&eventOccursOn(ev,ds)).forEach(ev=>{
         const card=el(`<div class="wk-ev" style="top:${minToTop(ev.start)}px;height:${Math.max(SNAP_MIN,ev.duration)*PX_PER_MIN-2}px;border-left-color:${ev.color||'#0d9488'}"><span class="t">${minToHHMM(ev.start)}</span><span class="n">${esc(ev.title)}</span></div>`);
         card.onclick=()=>openEvent(ev.id); col.appendChild(card);
       });
@@ -516,17 +528,21 @@
       const out=d.getMonth()!==mo;
       const cell=el(`<div class="mo-cell ${out?'out':''} ${ds===today?'today':''} ${ds===planDate?'sel':''}">
         <div class="mo-d">${d.getDate()}</div><div class="mo-items"></div></div>`);
-      const items=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(t.due===ds||(t.block&&t.block.date===ds))));
       const host=cell.querySelector('.mo-items');
-      items.slice(0,3).forEach(t=>{ const pc=t.priority<=3?`p${t.priority}`:'';
+      // 한 번(종일·기간) 일정 칩
+      const onceEvs=(state.events||[]).filter(ev=>ev.freq==='once'&&eventOccursOn(ev,ds));
+      onceEvs.forEach(ev=>host.appendChild(evAllDayChip(ev)));
+      const items=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(t.due===ds||(t.block&&t.block.date===ds))));
+      const room=Math.max(0,3-onceEvs.length);
+      items.slice(0,room).forEach(t=>{ const pc=t.priority<=3?`p${t.priority}`:'';
         const chip=el(`<div class="mo-chip ${isOverdue(t.due)?'overdue':''}" draggable="true" title="${esc(t.title)}"><span class="pt-dot ${pc}"></span>${esc(t.title)}</div>`);
         chip.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);});
         chip.addEventListener('click',e=>{e.stopPropagation();openTask(t.id);});
         host.appendChild(chip);
       });
-      if(items.length>3) host.appendChild(el(`<div class="mo-more">+${items.length-3}</div>`));
-      const hasEv=(state.events||[]).some(ev=>eventOccursOn(ev,ds));
-      if(hasEv) cell.querySelector('.mo-d').insertAdjacentHTML('afterbegin','<span class="mo-evdot">🔁</span> ');
+      if(items.length>room) host.appendChild(el(`<div class="mo-more">+${items.length-room}</div>`));
+      const hasRecur=(state.events||[]).some(ev=>ev.freq!=='once'&&eventOccursOn(ev,ds));
+      if(hasRecur) cell.querySelector('.mo-d').insertAdjacentHTML('afterbegin','<span class="mo-evdot">🔁</span> ');
       cell.onclick=()=>{ planDate=ds; setPlanView('day'); };
       makeDayDrop(cell,ds);
       cells.appendChild(cell);
@@ -643,13 +659,14 @@
     grid.addEventListener('dragover',e=>{e.preventDefault();showDropIndic(e);});
     grid.addEventListener('dragleave',e=>{ if(e.target===grid) hideDropIndic(); });
     grid.addEventListener('drop',e=>{e.preventDefault();hideDropIndic();const id=e.dataTransfer.getData('text/plain');if(id)scheduleTask(id,calMin(e));});
-    // 정기 일정 (반복 이벤트) — 규칙에 따라 해당 날짜에 표시
-    (state.events||[]).filter(ev=>eventOccursOn(ev,planDate)).forEach(ev=>{
+    // 일정 (정기 + 한 번) — 시간이 있는 것만 그리드에 표시 (종일은 상단 스트립)
+    (state.events||[]).filter(ev=>!ev.allDay&&eventOccursOn(ev,planDate)).forEach(ev=>{
       const top=minToTop(ev.start), height=Math.max(SNAP_MIN, ev.duration)*PX_PER_MIN-2;
+      const tag=ev.freq==='once'?'':'🔁 ';
       const card=el(`<div class="event-card" style="top:${top}px;height:${height}px;border-left-color:${ev.color||'#0d9488'}">
-        <div class="bc-main"><span class="time">🔁 ${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}</span><span class="bc-title">${esc(ev.title)}</span></div>
+        <div class="bc-main"><span class="time">${tag}${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}</span><span class="bc-title">${esc(ev.title)}</span></div>
       </div>`);
-      card.title=ev.title+' (정기 일정 — 클릭하여 편집)';
+      card.title=ev.title+' (일정 — 클릭하여 편집)';
       card.style.cursor='pointer';
       card.addEventListener('click',()=>openEvent(ev.id));
       grid.appendChild(card);
@@ -904,6 +921,11 @@
   const ORD_LABEL={1:'첫째',2:'둘째',3:'셋째',4:'넷째',5:'다섯째','-1':'마지막'};
   function describeEvent(ev){
     let s;
+    if(ev.freq==='once'){
+      const range=ev.endDate&&ev.endDate>ev.startDate?` ~ ${ev.endDate}`:'';
+      return ev.allDay ? `${ev.startDate}${range} · 종일`
+        : `${ev.startDate}${range} · ${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}`;
+    }
     if((ev.freq||'weekly')==='weekly'){
       const dl=ev.days.slice().sort((a,b)=>a-b).map(d=>'일월화수목금토'[d]).join('·');
       s=(ev.interval>1?`${ev.interval}주마다 `:'매주 ')+dl;
@@ -921,8 +943,8 @@
   }
   function renderEventList(){
     const host=$('#eventList'); if(!host) return; host.innerHTML='';
-    const evs=(state.events||[]).slice().sort((a,b)=>a.start-b.start);
-    if(!evs.length){ host.appendChild(el(`<div class="note" style="padding:4px 2px">등록된 정기 일정이 없습니다. 수업·정기 미팅을 추가하세요.</div>`)); return; }
+    const evs=(state.events||[]).slice().sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||'')||((a.start||0)-(b.start||0)));
+    if(!evs.length){ host.appendChild(el(`<div class="note" style="padding:4px 2px">등록된 일정이 없습니다. 정기 일정·종일/기간 일정을 추가하세요.</div>`)); return; }
     evs.forEach(ev=>{
       const row=el(`<div class="event-row">
         <span class="ev-color" style="background:${ev.color||'#0d9488'}"></span>
@@ -935,21 +957,37 @@
   }
   function updateEventModalVisibility(){
     const freq=$('#ev-freq').value, endMode=$('#ev-endmode').value, monthMode=$('#ev-monthmode').value;
-    $('#ev-days-field').style.display=freq==='weekly'?'':'none';
-    $('#ev-monthmode-field').style.display=freq==='monthly'?'':'none';
-    $('#ev-monthweek-field').style.display=(freq==='monthly'&&monthMode==='weekday')?'':'none';
-    $('#ev-enddate-field').style.display=endMode==='date'?'':'none';
-    $('#ev-count-field').style.display=endMode==='count'?'':'none';
+    const once=freq==='once', allDay=$('#ev-allday').checked;
+    // 한 번(종일·기간) 전용
+    $('#ev-allday-field').style.display=once?'':'none';
+    $('#ev-onceend-field').style.display=once?'':'none';
+    $('#ev-time-row').style.display=(once&&allDay)?'none':'';
+    $('#ev-startdate-label').textContent=once?'시작일 (또는 단일 날짜)':'시작일';
+    // 정기 전용 (한 번이면 숨김)
+    $('#ev-interval-field').style.display=once?'none':'';
+    $('#ev-days-field').style.display=(!once&&freq==='weekly')?'':'none';
+    $('#ev-monthmode-field').style.display=(!once&&freq==='monthly')?'':'none';
+    $('#ev-monthweek-field').style.display=(!once&&freq==='monthly'&&monthMode==='weekday')?'':'none';
+    $('#ev-endmode-field').style.display=once?'none':'';
+    $('#ev-enddate-field').style.display=(!once&&endMode==='date')?'':'none';
+    $('#ev-count-field').style.display=(!once&&endMode==='count')?'':'none';
+    $('#ev-exholiday-field').style.display=once?'none':'';
+    $('#ev-note').textContent=once?'기간 일정은 시작일~종료일의 모든 날에 표시됩니다. 종일이면 시간 없이 상단에 표시됩니다.'
+      :"월 단위는 시작일의 '일(日)'에 반복됩니다. 캘린더·스케줄표에 자동 표시됩니다.";
   }
-  function openEvent(id){
+  function openEvent(id,presetFreq){
     editingEventId=(typeof id==='string')?id:null;
     const ev=editingEventId?(state.events||[]).find(x=>x.id===editingEventId):null;
-    $('#eventModalTitle').textContent=ev?'🔁 정기 일정 편집':'🔁 정기 일정 추가';
+    const freq=ev?(ev.freq||'weekly'):(presetFreq||'weekly');
+    const once=freq==='once';
+    $('#eventModalTitle').textContent=(ev?'편집 — ':'추가 — ')+(once?'📅 종일·기간 일정':'🔁 정기 일정');
     $('#evDeleteBtn').style.display=ev?'':'none';
     $('#ev-title').value=ev?ev.title:'';
-    $('#ev-start').value=ev?minToHHMM(ev.start):'09:00';
-    $('#ev-dur').value=ev?ev.duration:60;
-    $('#ev-freq').value=ev?(ev.freq||'weekly'):'weekly';
+    $('#ev-allday').checked=ev?!!ev.allDay:false;
+    $('#ev-start').value=(ev&&ev.start!=null)?minToHHMM(ev.start):'09:00';
+    $('#ev-dur').value=(ev&&ev.duration!=null)?ev.duration:60;
+    $('#ev-onceend').value=(ev&&once&&ev.endDate)?ev.endDate:'';
+    $('#ev-freq').value=freq;
     $('#ev-interval').value=ev?String(ev.interval||1):'1';
     document.querySelectorAll('#evDays button').forEach(b=>b.classList.toggle('sel', ev&&ev.days?ev.days.includes(+b.dataset.d):false));
     const sd=ev?ev.startDate:planDate;
@@ -973,6 +1011,20 @@
   function saveEvent(){
     const title=$('#ev-title').value.trim(); if(!title){ $('#ev-title').focus(); return; }
     const freq=$('#ev-freq').value;
+    if(freq==='once'){
+      const allDay=$('#ev-allday').checked;
+      const startDate=$('#ev-startdate').value||planDate;
+      let endDate=$('#ev-onceend').value||startDate;
+      if(endDate<startDate) endDate=startDate;
+      let start=null,dur=null;
+      if(!allDay){ start=hhmmToMin($('#ev-start').value); if(start==null){ alert('시작 시각을 입력하세요.'); return; } dur=Math.max(10,+($('#ev-dur').value)||60); }
+      const data={title,freq:'once',allDay,startDate,endDate,start,duration:dur,color:evColor,
+        days:[],interval:1,monthMode:undefined,ordinal:undefined,weekday:undefined,endMode:'never',count:null,excludeHolidays:false};
+      if(!state.events) state.events=[];
+      if(editingEventId){ const ex=state.events.find(x=>x.id===editingEventId); if(ex) Object.assign(ex,data); }
+      else state.events.push({id:uid(),...data});
+      save(); $('#eventOverlay').classList.remove('show'); renderPlan(); return;
+    }
     const interval=Math.max(1,+$('#ev-interval').value||1);
     const days=[...document.querySelectorAll('#evDays button.sel')].map(b=>+b.dataset.d);
     if(freq==='weekly'&&!days.length){ alert('요일을 하나 이상 선택하세요.'); return; }
@@ -984,7 +1036,7 @@
     const count=endMode==='count'?Math.max(1,+$('#ev-count').value||1):null;
     if(endMode==='date'&&!endDate){ alert('종료일을 입력하세요.'); return; }
     const monthMode=$('#ev-monthmode').value;
-    const data={title,start,duration:dur,freq,interval,days:freq==='weekly'?days:[],
+    const data={title,start,duration:dur,freq,interval,allDay:false,days:freq==='weekly'?days:[],
       monthMode:freq==='monthly'?monthMode:undefined,
       ordinal:(freq==='monthly'&&monthMode==='weekday')?+$('#ev-ordinal').value:undefined,
       weekday:(freq==='monthly'&&monthMode==='weekday')?+$('#ev-weekday').value:undefined,
@@ -1396,6 +1448,7 @@
   $('#evCancelBtn').onclick=()=>$('#eventOverlay').classList.remove('show');
   $('#evDeleteBtn').onclick=()=>{ if(editingEventId){ state.events=(state.events||[]).filter(x=>x.id!==editingEventId); save(); $('#eventOverlay').classList.remove('show'); renderPlan(); } };
   $('#ev-freq').onchange=updateEventModalVisibility;
+  $('#ev-allday').onchange=updateEventModalVisibility;
   $('#ev-endmode').onchange=updateEventModalVisibility;
   $('#ev-monthmode').onchange=updateEventModalVisibility;
   document.querySelectorAll('#evDays button').forEach(b=>b.onclick=()=>b.classList.toggle('sel'));

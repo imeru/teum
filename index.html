@@ -168,6 +168,8 @@
   /* 캘린더 상단 네비 + 일/주/월 토글 */
   .cal-body{flex:1;min-height:0;display:flex}
   .day-wrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
+  .day-allday{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:4px;max-height:84px;overflow-y:auto}
+  .ad-chip{display:block;font-size:11px;color:#fff;border-radius:5px;padding:2px 7px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-weight:600}
   .early-toggle{flex:0 0 auto;border:1px dashed var(--border);background:var(--panel-2);color:var(--muted);border-radius:10px;padding:6px;font-size:12px;font-weight:600;cursor:pointer;width:100%}
   .early-toggle:hover{border-color:var(--accent);color:var(--accent)}
   .cal-nav{display:flex;align-items:center;gap:8px}
@@ -524,16 +526,12 @@
   <div class="modal" style="width:min(460px,100%)">
     <div class="modal-head" id="eventModalTitle">🔁 정기 일정 추가</div>
     <div class="modal-body">
-      <div class="field"><label>제목</label><input id="ev-title" placeholder="예: 건축환경 강의, 연구실 미팅" /></div>
+      <div class="field"><label>제목</label><input id="ev-title" placeholder="예: 휴가, 출장, 건축환경 강의" /></div>
       <div class="row">
-        <div class="field"><label>시작 시각</label><input id="ev-start" type="time" value="09:00" /></div>
-        <div class="field"><label>소요(분)</label><input id="ev-dur" type="number" min="10" step="10" value="60" /></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>반복 주기</label>
-          <select id="ev-freq"><option value="weekly">주 단위</option><option value="monthly">월 단위</option></select>
+        <div class="field"><label>유형</label>
+          <select id="ev-freq"><option value="weekly">정기 (주 단위)</option><option value="monthly">정기 (월 단위)</option><option value="once">한 번 (종일·기간)</option></select>
         </div>
-        <div class="field"><label>간격</label>
+        <div class="field" id="ev-interval-field"><label>간격</label>
           <select id="ev-interval">
             <option value="1">1 (매주·매월)</option>
             <option value="2">2 (격주·격월)</option>
@@ -541,6 +539,11 @@
             <option value="4">4마다</option>
           </select>
         </div>
+      </div>
+      <div class="field" id="ev-allday-field" style="display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="ev-allday" style="width:auto" /> 종일 (시간 없음)</label></div>
+      <div class="row" id="ev-time-row">
+        <div class="field"><label>시작 시각</label><input id="ev-start" type="time" value="09:00" /></div>
+        <div class="field"><label>소요(분)</label><input id="ev-dur" type="number" min="10" step="10" value="60" /></div>
       </div>
       <div class="field" id="ev-days-field"><label>반복 요일</label>
         <div class="weekday-pick" id="evDays">
@@ -565,20 +568,21 @@
         </div>
       </div>
       <div class="row">
-        <div class="field"><label>시작일</label><input id="ev-startdate" type="date" /></div>
-        <div class="field"><label>종료 조건</label>
+        <div class="field"><label id="ev-startdate-label">시작일</label><input id="ev-startdate" type="date" /></div>
+        <div class="field" id="ev-endmode-field"><label>종료 조건</label>
           <select id="ev-endmode">
             <option value="never">없음 (계속 반복)</option>
             <option value="date">종료일까지</option>
             <option value="count">횟수 후 종료</option>
           </select>
         </div>
+        <div class="field" id="ev-onceend-field" style="display:none"><label>종료일 (기간)</label><input id="ev-onceend" type="date" /></div>
       </div>
       <div class="field" id="ev-enddate-field" style="display:none"><label>종료일</label><input id="ev-enddate" type="date" /></div>
       <div class="field" id="ev-count-field" style="display:none"><label>반복 횟수 (시작일로부터)</label><input id="ev-count" type="number" min="1" value="10" /></div>
-      <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="ev-exholiday" style="width:auto" /> 공휴일·휴무일 제외</label></div>
+      <div class="field" id="ev-exholiday-field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="ev-exholiday" style="width:auto" /> 공휴일·휴무일 제외</label></div>
       <div class="field"><label>색상</label><div class="prio-pick" id="evColors"></div></div>
-      <div class="note">월 단위는 시작일의 '일(日)'에 반복됩니다. 캘린더·스케줄표에 자동 표시됩니다.</div>
+      <div class="note" id="ev-note">월 단위는 시작일의 '일(日)'에 반복됩니다. 캘린더·스케줄표에 자동 표시됩니다.</div>
     </div>
     <div class="modal-foot">
       <button class="btn" id="evDeleteBtn" style="margin-right:auto;color:var(--p1)">삭제</button>
