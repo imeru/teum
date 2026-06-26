@@ -68,6 +68,7 @@
       if(ev.freq==='monthly'&&!ev.monthMode) ev.monthMode='date';
       if(ev.excludeHolidays===undefined) ev.excludeHolidays=false;
     });
+    (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
     return s;
   }
   function loadCfg(){
@@ -293,6 +294,7 @@
       </div>
     </div>`);
     node.querySelector('.task-title').textContent=t.title;
+    const sb=subBadgeEl(t); if(sb) node.querySelector('.task-title').appendChild(sb);
     const meta=node.querySelector('.task-meta');
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
     if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">📅 ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`)); }
@@ -618,6 +620,7 @@
       const slot=el(`<div class="top3-slot ${t?'filled':''}" ${t?'draggable="true"':''}>
         <span class="top3-num">${i+1}</span>
         <span class="t3-title">${t?esc(t.title):'여기로 끌어다 놓기'}</span>
+        ${t?subBadgeHTML(t):''}
         ${t?'<button class="iconbtn" title="비우기">✕</button>':''}
       </div>`);
       if(t){ slot.querySelector('button').onclick=()=>clearTop3Slot(i); slot.querySelector('.t3-title').onclick=()=>openTask(t.id);
@@ -667,6 +670,7 @@
       const card=el(`<div class="pool-task ${isOverdue(t.due)?'overdue':''}" draggable="true">
         <span class="pt-dot ${pc}"></span>
         <span class="pt-title">${esc(t.title)}</span>
+        ${subBadgeHTML(t)}
         ${isOverdue(t.due)?'<span class="pt-badge">밀림</span>':''}
       </div>`);
       card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);});
@@ -715,7 +719,7 @@
       const top=minToTop(t.block.start), height=Math.max(SNAP_MIN, t.block.duration)*PX_PER_MIN-2;
       const pc=t.priority<=2?`p${t.priority}`:'';
       const card=el(`<div class="block-card ${pc}" draggable="true" style="top:${top}px;height:${height}px">
-        <div class="bc-main"><span class="time">${minToHHMM(t.block.start)}~${minToHHMM(t.block.start+t.block.duration)}</span><span class="bc-title">${esc(t.title)}</span></div>
+        <div class="bc-main"><span class="time">${minToHHMM(t.block.start)}~${minToHHMM(t.block.start+t.block.duration)}</span><span class="bc-title">${esc(t.title)}${subBadgeHTML(t)}</span></div>
         <button class="bc-x iconbtn" title="배치 해제">✕</button>
         <div class="block-resize" title="드래그하여 길이 조절"></div>
       </div>`);
@@ -1139,6 +1143,43 @@
   }
 
   // ---------- Task modal ----------
+  // 체크리스트 진행 배지 (예: ☑ 3/7) — 완료 시 초록
+  function subProgress(t){
+    const s=t&&t.subtasks||[]; if(!s.length) return null;
+    const d=s.filter(x=>x.done).length;
+    return {done:d, total:s.length, all:d===s.length};
+  }
+  function subBadgeEl(t){
+    const p=subProgress(t); if(!p) return null;
+    return el(`<span class="sub-badge ${p.all?'all':''}">☑ ${p.done}/${p.total}</span>`);
+  }
+  function subBadgeHTML(t){
+    const p=subProgress(t); return p?`<span class="sub-badge ${p.all?'all':''}">☑ ${p.done}/${p.total}</span>`:'';
+  }
+  let editSubtasks=[]; // 모달에서 편집 중인 체크리스트
+  function renderChecklistEditor(focusIdx){
+    const host=$('#f-checklist'); if(!host) return; host.innerHTML='';
+    editSubtasks.forEach((st,i)=>{
+      const row=el(`<div class="cl-row">
+        <button type="button" class="cl-check ${st.done?'on':''}">${st.done?'✓':''}</button>
+        <input class="cl-input" value="${esc(st.title)}" placeholder="세부 항목" />
+        <button type="button" class="iconbtn cl-del" title="삭제">✕</button>
+      </div>`);
+      row.querySelector('.cl-check').onclick=()=>{ st.done=!st.done; renderChecklistEditor(); };
+      row.querySelector('.cl-input').addEventListener('input',e=>{ st.title=e.target.value; updateChecklistCount(); });
+      row.querySelector('.cl-input').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addSubtask(); } });
+      row.querySelector('.cl-del').onclick=()=>{ editSubtasks.splice(i,1); renderChecklistEditor(); };
+      host.appendChild(row);
+    });
+    updateChecklistCount();
+    if(focusIdx!=null){ const inputs=host.querySelectorAll('.cl-input'); if(inputs[focusIdx]) inputs[focusIdx].focus(); }
+  }
+  function addSubtask(){ editSubtasks.push({id:uid(),title:'',done:false}); renderChecklistEditor(editSubtasks.length-1); }
+  function updateChecklistCount(){
+    const c=$('#f-checklist-count'); if(!c) return;
+    const valid=editSubtasks.filter(s=>s.title.trim());
+    c.textContent=valid.length?`${valid.filter(s=>s.done).length}/${valid.length}`:'';
+  }
   function openTask(id){
     editingId=id;
     const t=id?state.tasks.find(x=>x.id===id):null;
@@ -1146,6 +1187,8 @@
     $('#taskDeleteBtn').style.display=id?'':'none';
     $('#f-title').value=t?t.title:'';
     $('#f-notes').value=t?t.notes:'';
+    editSubtasks=(t&&Array.isArray(t.subtasks))?t.subtasks.map(s=>({id:s.id||uid(),title:s.title||'',done:!!s.done})):[];
+    renderChecklistEditor();
     $('#f-status').value=t?t.status==='done'?(t._prev||'next'):t.status:(currentView==='inbox'?'inbox':'next');
     fillProjectSelect(t?t.projectId:(currentFilter&&currentFilter.type==='project'?currentFilter.value:''));
     $('#f-due').value=t?t.due||'':(currentView==='today'?todayStr():'');
@@ -1172,9 +1215,10 @@
     const bd=$('#f-blockdate').value, bs=$('#f-blockstart').value;
     if(bd&&bs){ block={date:bd,start:hhmmToMin(bs),duration:+($('#f-blockdur').value)||60}; }
     const due=$('#f-due').value||null;
+    const subtasks=editSubtasks.filter(s=>s.title.trim()).map(s=>({id:s.id,title:s.title.trim(),done:!!s.done}));
     const data={title,notes:$('#f-notes').value.trim(),status:$('#f-status').value,
       projectId:$('#f-project').value,due,dueTime:due?($('#f-duetime').value||null):null,tags,priority:selectedPrio,
-      estimate:(+$('#f-estimate').value||null),block};
+      estimate:(+$('#f-estimate').value||null),block,subtasks};
     if(editingId){ const t=state.tasks.find(x=>x.id===editingId); Object.assign(t,data); t.updatedAt=Date.now(); }
     else { state.tasks.push({id:uid(),...data,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null}); }
     save(); closeTask(); render();
@@ -1505,6 +1549,7 @@
   $('#evDeleteBtn').onclick=()=>{ if(editingEventId){ state.events=(state.events||[]).filter(x=>x.id!==editingEventId); save(); $('#eventOverlay').classList.remove('show'); renderPlan(); } };
   $('#ev-freq').onchange=updateEventModalVisibility;
   $('#ev-allday').onchange=updateEventModalVisibility;
+  $('#f-add-sub').onclick=addSubtask;
   $('#ev-endmode').onchange=updateEventModalVisibility;
   $('#ev-monthmode').onchange=updateEventModalVisibility;
   document.querySelectorAll('#evDays button').forEach(b=>b.onclick=()=>b.classList.toggle('sel'));
