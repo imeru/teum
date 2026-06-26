@@ -24,6 +24,7 @@
   let syncTimer = null;
   let lastPushedHash = '';
   let authUser = null;      // 로그인된 Google 계정
+  let authChecked = false;  // 세션 확인 완료 여부 (게이트 로딩 표시용)
   function syncKey(){ return authUser ? ('u_'+authUser.id) : (cloud.space||''); }
 
   // Pomodoro runtime (lives across view switches)
@@ -1116,26 +1117,35 @@
       // 기존 세션 확인 + 상태 변화 구독 (Google 로그인)
       supa.auth.getSession().then(({data})=>{
         authUser=data&&data.session?data.session.user:null;
+        authChecked=true; updateAuthGate();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(syncKey()) cloudPull(false);
       });
       supa.auth.onAuthStateChange((_e,session)=>{
         authUser=session?session.user:null;
+        authChecked=true; updateAuthGate();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(authUser&&syncKey()) cloudPull(false);
       });
       updateSyncBadge();
       if(syncKey()) await cloudPull(false);
-    }catch(err){ console.warn('Supabase init 실패',err); supa=null; updateSyncBadge(); }
+    }catch(err){ console.warn('Supabase init 실패',err); supa=null; authChecked=true; updateAuthGate(); updateSyncBadge(); }
+  }
+  // 로그인 게이트: 로그인 전까지 앱 위를 덮는다(로그인 필수).
+  function updateAuthGate(){
+    const g=document.getElementById('authGate'); if(!g) return;
+    g.classList.toggle('checking', !authChecked);
+    g.classList.toggle('show', !authUser);
   }
   async function googleLogin(){
-    if(!supa){ alert('먼저 Supabase 연결을 저장하세요.'); return; }
+    if(!supa){ await initSupa(); }
+    if(!supa){ alert('로그인 서버에 연결하지 못했습니다. 네트워크를 확인해 주세요.'); return; }
     const {error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
     if(error) alert('로그인 실패: '+error.message);
   }
   async function googleLogout(){
     if(supa) await supa.auth.signOut();
-    authUser=null; updateSyncBadge(); if(currentView==='settings') renderSettings();
+    authUser=null; updateSyncBadge(); updateAuthGate(); if(currentView==='settings') renderSettings();
   }
   function updateSyncBadge(){
     const b=$('#syncBadge'); if(!b) return;
@@ -1235,7 +1245,12 @@
   if('serviceWorker' in navigator){ navigator.serviceWorker.register('service-worker.js').catch(()=>{}); }
 
   // ---------- Boot ----------
+  const gateBtn=document.getElementById('gate-google');
+  if(gateBtn) gateBtn.onclick=googleLogin;
   setView('plan');
+  updateAuthGate();
   if(cloud.url&&cloud.key) initSupa();
+  // 세션 확인이 지연되면(느린 네트워크 등) 로그인 버튼이라도 보여줌
+  setTimeout(()=>{ if(!authChecked){ authChecked=true; updateAuthGate(); } }, 7000);
 
 })();
