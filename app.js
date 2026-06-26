@@ -5,13 +5,13 @@
   // ---------- State ----------
   const LS_KEY = 'flowdo.state.v1';
   const CFG_KEY = 'flowdo.cloud.v1';
+  // PROJECT_COLORS/DOW/STATUS/FREQ/PLANVIEW → constants.js, 순수 헬퍼 → helpers.js
   // 공용 백엔드: anon(publishable) 키는 클라이언트 공개용이며 데이터 보호는 RLS가 담당.
   // 모든 방문자가 별도 설정 없이 같은 백엔드로 Google 로그인 → 자동 동기화.
   const DEFAULT_CLOUD = {
     url: 'https://btmyvomigijtikajaazv.supabase.co',
     key: 'sb_publishable_PCfTgna_8CzZBS3F_Gi9AA_y5P-hFUn'
   };
-  const PROJECT_COLORS = ['#4f46e5','#16a34a','#e5484d','#f76808','#0091ff','#9333ea','#0d9488','#db2777'];
 
   let state = load();
   let cloud = loadCfg();
@@ -85,41 +85,7 @@
     scheduleSync();
   }
 
-  // ---------- Date helpers ----------
-  function todayStr(d=new Date()){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-  function pad(n){ return String(n).padStart(2,'0'); }
-  function parseDS(ds){ return new Date(ds+'T00:00:00'); }
-  function addDaysDS(ds,n){ const d=parseDS(ds); d.setDate(d.getDate()+n); return todayStr(d); }
-  function addMonthsDS(ds,n){ const d=parseDS(ds); d.setMonth(d.getMonth()+n); return todayStr(d); }
-  function startOfWeekDS(ds){ const d=parseDS(ds); d.setDate(d.getDate()-d.getDay()); return todayStr(d); } // 일요일 시작
-  const DOW='일월화수목금토';
-  function fmtDue(s){
-    if(!s) return '';
-    const d=new Date(s+'T00:00:00'), t=new Date(todayStr()+'T00:00:00');
-    const diff=Math.round((d-t)/86400000);
-    if(diff===0) return '오늘'; if(diff===1) return '내일'; if(diff===-1) return '어제';
-    if(diff<0) return `${-diff}일 지남`;
-    if(diff<7) return `${diff}일 후`;
-    return `${d.getMonth()+1}/${d.getDate()}`;
-  }
-  function isOverdue(s){ if(!s) return false; return s < todayStr(); }
-  function minToHHMM(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
-  function hhmmToMin(s){ if(!s) return null; const[a,b]=s.split(':').map(Number); return a*60+b; }
-  function startOfWeek(d){ const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-x.getDay()); return x; }
-  function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
-  // 월 n번째 요일 날짜 (ord: 1~5, -1=마지막)
-  function nthWeekday(y,m,wd,ord){
-    if(ord===-1){ const last=new Date(y,m+1,0); const diff=(last.getDay()-wd+7)%7; return new Date(y,m,last.getDate()-diff); }
-    const first=new Date(y,m,1); const diff=(wd-first.getDay()+7)%7; const day=1+diff+(ord-1)*7;
-    if(day>new Date(y,m+1,0).getDate()) return null; return new Date(y,m,day);
-  }
-  // 월간 반복: 해당 연·월의 발생 날짜(Date) 또는 null
-  function monthlyOccDate(ev,y,m){
-    if(ev.monthMode==='weekday') return nthWeekday(y,m,ev.weekday,ev.ordinal);
-    const dom=new Date(ev.startDate+'T00:00:00').getDate();
-    if(dom>new Date(y,m+1,0).getDate()) return null;
-    return new Date(y,m,dom);
-  }
+  // ---------- Date/DOM helpers는 helpers.js, 상수는 constants.js로 분리됨 ----------
   // 정기 일정이 특정 날짜(ds)에 발생하는가
   function eventOccursOn(ev,ds){
     if(!ev.startDate) ev.startDate=ds;
@@ -171,7 +137,6 @@
   }
 
   // ---------- DOM ----------
-  const $ = s => document.querySelector(s);
   const content = $('#content');
 
   // ---------- Views ----------
@@ -1669,8 +1634,7 @@
     document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
   }
 
-  // ---------- Helpers ----------
-  function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
+  // ---------- Helpers (el·esc·$ 등 순수 헬퍼는 helpers.js) ----------
   // 사이드바 항목에 할 일 카드 드롭 → 상태/프로젝트/태그/오늘 변경
   function makeNavDrop(elem, fn){
     elem.addEventListener('dragover',e=>{e.preventDefault();elem.classList.add('nav-drop');});
@@ -1681,7 +1645,6 @@
       if(t){ fn(t); t.updatedAt=Date.now(); save(); render(); }
     });
   }
-  function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   // ---------- Sidebar mobile ----------
   function openSidebar(){ $('#sidebar').classList.add('open'); $('#backdrop').classList.add('show'); }

@@ -8,7 +8,8 @@ import { fileURLToPath } from 'url';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(DIR, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const JS = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+// 로드 순서대로 평가 (constants → helpers → app)
+const JS = ['constants.js', 'helpers.js', 'app.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n;\n');
 
 const pad = n => String(n).padStart(2, '0');
 const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
