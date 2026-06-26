@@ -1253,13 +1253,17 @@
   function notifySupported(){ return typeof window!=='undefined' && 'Notification' in window; }
   function notifyEnabled(){ return !!(state.settings&&state.settings.notify) && notifySupported() && Notification.permission==='granted'; }
   function showNotify(title, body, tag){
-    if(!notifySupported() || Notification.permission!=='granted') return;
-    const opts={ body, tag, icon:'icons/icon-192.png', badge:'icons/icon-192.png' };
+    if(!notifySupported() || Notification.permission!=='granted') return false;
+    const opts={ body, tag, icon:'icons/icon-192.png', badge:'icons/icon-192.png', renotify:true };
+    const viaCtor=()=>{ try{ new Notification(title,opts); }catch(_){} };
     try{
       if(navigator.serviceWorker && navigator.serviceWorker.ready){
-        navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,opts)).catch(()=>{ try{ new Notification(title,opts); }catch(_){} });
-      } else { new Notification(title,opts); }
-    }catch(_){}
+        let done=false;
+        navigator.serviceWorker.ready.then(reg=>{ done=true; return reg.showNotification(title,opts); }).catch(viaCtor);
+        setTimeout(()=>{ if(!done) viaCtor(); }, 700); // SW가 늦으면 직접 발송 폴백
+      } else { viaCtor(); }
+    }catch(_){ viaCtor(); }
+    return true;
   }
   async function enableNotifications(){
     if(!notifySupported()){ alert('이 브라우저는 알림을 지원하지 않습니다.'); return false; }
@@ -1507,8 +1511,9 @@
     };
     box.querySelector('#nt-lead').onchange=e=>{ state.settings.notifyLead=+e.target.value||0; save(); };
     box.querySelector('#nt-test').onclick=async()=>{
-      const ok=await enableNotifications(); if(!ok) return;
+      const ok=await enableNotifications(); if(!ok){ refreshNtStatus(); return; }
       showNotify('🔔 틈(TEUM) 알림','알림이 정상 동작합니다.','teum-test');
+      toast('테스트 알림을 보냈어요. 안 보이면 OS 알림/방해금지(집중) 설정을 확인하세요.');
     };
     refreshNtStatus();
     // 공휴일 관리
