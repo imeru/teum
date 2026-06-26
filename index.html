@@ -106,7 +106,7 @@
   .auth-gate:not(.checking) .auth-checking{display:none}
 
   /* Time-box view */
-  .tb{display:grid;grid-template-columns:minmax(280px,4fr) minmax(0,6fr);gap:16px;height:100%;min-height:0}
+  .tb{display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:16px;height:100%;min-height:0}
   .tb-left{display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding-right:2px;min-height:0}
   .tb-right{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
   .tb-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
@@ -167,6 +167,9 @@
 
   /* 캘린더 상단 네비 + 일/주/월 토글 */
   .cal-body{flex:1;min-height:0;display:flex}
+  .day-wrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
+  .early-toggle{flex:0 0 auto;border:1px dashed var(--border);background:var(--panel-2);color:var(--muted);border-radius:10px;padding:6px;font-size:12px;font-weight:600;cursor:pointer;width:100%}
+  .early-toggle:hover{border-color:var(--accent);color:var(--accent)}
   .cal-nav{display:flex;align-items:center;gap:8px}
   .cal-arrow{font-size:20px;line-height:1;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--panel)}
   .cal-arrow:hover{background:var(--panel-2)}

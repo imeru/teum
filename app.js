@@ -412,13 +412,20 @@
     else renderDay(body);
   }
   function renderDay(body){
-    body.appendChild(el(`<div class="calendar"><div class="cal-grid" id="calGrid"></div></div>`));
+    CAL_START = dayExpanded ? 0 : 8;
+    const wrap=el(`<div class="day-wrap">
+      <button class="early-toggle">${dayExpanded?'▴ 새벽 시간 접기 (00–08시)':'▾ 새벽 시간 보기 (00–08시)'}</button>
+      <div class="calendar"><div class="cal-grid" id="calGrid"></div></div>
+    </div>`);
+    wrap.querySelector('.early-toggle').onclick=()=>{ dayExpanded=!dayExpanded; renderCalBody(); };
+    body.appendChild(wrap);
     renderCalendar();
     startNowLine();
   }
 
   // ---- 주간 보기: 7열 시간 그리드 ----
   function renderWeek(body){
+    CAL_START=6;
     const ws=startOfWeekDS(planDate);
     const days=[]; for(let i=0;i<7;i++) days.push(addDaysDS(ws,i));
     const today=todayStr();
@@ -608,7 +615,9 @@
   }
 
   // -- Day calendar (10분 단위 · 자유 드래그 이동 · 길이 조절 · 정기 일정 표시) --
-  const CAL_START=6, CAL_END=24, SNAP_MIN=10, PX_PER_MIN=1; // 1분=1px, 10분 단위 스냅
+  let CAL_START=8;                          // 일간: 기본 08시 시작(가변), 주간: 6시
+  const CAL_END=24, SNAP_MIN=10, PX_PER_MIN=1; // 1분=1px, 10분 단위 스냅
+  let dayExpanded=false;                     // 일간에서 새벽(00–08시) 펼침 여부
   let dragOffsetMin=0, resizing=false;
   function minToTop(min){ return (min-CAL_START*60)*PX_PER_MIN; }
   function snapMin(m){ return Math.round(m/SNAP_MIN)*SNAP_MIN; }
