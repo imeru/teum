@@ -22,7 +22,6 @@
   let projColor = PROJECT_COLORS[0];
   let supa = null;          // supabase client
   let syncTimer = null;
-  let lastPushedHash = '';
   let authUser = null;      // 로그인된 Google 계정
   let authChecked = false;  // 세션 확인 완료 여부 (게이트 로딩 표시용)
   let deferredInstall = null; // PWA 설치 프롬프트 (Chromium 계열)
@@ -305,7 +304,6 @@
     if(t.estimate){ meta.appendChild(el(`<span class="chip">⏱ ${t.estimate}분</span>`)); }
     const sc=sessionsForTask(t.id); if(sc) meta.appendChild(el(`<span class="chip pomo">🍅 ${sc}</span>`));
     (t.tags||[]).forEach(tag=>{ const c=el(`<span class="chip tag">${esc(tag)}</span>`); c.addEventListener('click',e=>{e.stopPropagation();setView('tag',{type:'tag',value:tag});}); meta.appendChild(c); });
-    if(t.status!=='next'&&t.status!=='done'&&!currentFilter&&currentView!=='today'){}
 
     node.querySelector('.check').addEventListener('click',e=>{e.stopPropagation();toggleDone(t.id);});
     node.querySelector('[data-act="pomo"]').addEventListener('click',e=>{e.stopPropagation();startPomoForTask(t.id);});
@@ -1583,7 +1581,7 @@
   }
   function importJson(e){
     const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader(); r.onload=()=>{ try{ const s=JSON.parse(r.result); if(s.tasks){ state=s; save(); render(); alert('가져오기 완료'); } }catch(err){ alert('잘못된 파일'); } }; r.readAsText(f);
+    const r=new FileReader(); r.onload=()=>{ try{ const s=JSON.parse(r.result); if(s.tasks){ state=migrate(s); save(); render(); alert('가져오기 완료'); } }catch(err){ alert('잘못된 파일'); } }; r.readAsText(f);
   }
 
   // Supabase via dynamic import (CDN). Loads only when configured.
@@ -1652,7 +1650,7 @@
       if(error) throw error;
       if(data&&data.data){
         if(manual || data.updated_at>(state.updatedAt||0)){
-          state=data.data; localStorage.setItem(LS_KEY,JSON.stringify(state)); render();
+          state=migrate(data.data); localStorage.setItem(LS_KEY,JSON.stringify(state)); render();
           if(manual) toast('서버에서 불러왔습니다.');
         }
       } else if(manual){ toast('서버에 데이터가 없어 현재 내용을 올립니다.'); cloudPush(true); }
