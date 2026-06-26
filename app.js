@@ -425,11 +425,15 @@
 
   // ---- 주간 보기: 7열 시간 그리드 ----
   function renderWeek(body){
-    CAL_START=6;
+    CAL_START = dayExpanded ? 0 : 8;
     const ws=startOfWeekDS(planDate);
     const days=[]; for(let i=0;i<7;i++) days.push(addDaysDS(ws,i));
     const today=todayStr();
     const gridH=(CAL_END-CAL_START)*60*PX_PER_MIN;
+    const wrap=el(`<div class="day-wrap">
+      <button class="early-toggle">${dayExpanded?'▴ 새벽 시간 접기 (00–08시)':'▾ 새벽 시간 보기 (00–08시)'}</button>
+    </div>`);
+    wrap.querySelector('.early-toggle').onclick=()=>{ dayExpanded=!dayExpanded; renderCalBody(); };
     const wk=el(`<div class="wk">
       <div class="wk-head"><div class="wk-gutter"></div><div class="wk-heads"></div></div>
       <div class="wk-allday"><div class="wk-gutter">할 일</div><div class="wk-ad-cols"></div></div>
@@ -470,10 +474,11 @@
       // 작업 블록
       state.tasks.filter(t=>t.block&&t.block.date===ds).forEach(t=>{
         const pc=t.priority<=2?`p${t.priority}`:'';
-        const card=el(`<div class="wk-blk ${pc}" draggable="true" style="top:${minToTop(t.block.start)}px;height:${Math.max(SNAP_MIN,t.block.duration)*PX_PER_MIN-2}px"><span class="t">${minToHHMM(t.block.start)}</span><span class="n">${esc(t.title)}</span></div>`);
-        card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',t.id); const r=card.getBoundingClientRect(); dragOffsetMin=snapMin((e.clientY-r.top)/PX_PER_MIN); });
+        const card=el(`<div class="wk-blk ${pc}" draggable="true" style="top:${minToTop(t.block.start)}px;height:${Math.max(SNAP_MIN,t.block.duration)*PX_PER_MIN-2}px"><span class="t">${minToHHMM(t.block.start)}</span><span class="n">${esc(t.title)}</span><div class="block-resize" title="드래그하여 길이 조절"></div></div>`);
+        card.addEventListener('dragstart',e=>{ if(resizing){e.preventDefault();return;} e.dataTransfer.setData('text/plain',t.id); const r=card.getBoundingClientRect(); dragOffsetMin=snapMin((e.clientY-r.top)/PX_PER_MIN); });
         card.addEventListener('dragend',()=>{dragOffsetMin=0;});
         card.addEventListener('click',()=>openTask(t.id));
+        initResize(card.querySelector('.block-resize'),card,t);
         col.appendChild(card);
       });
       // 현재 시각선
@@ -489,7 +494,8 @@
       });
       cols.appendChild(col);
     });
-    body.appendChild(wk);
+    wrap.appendChild(wk);
+    body.appendChild(wrap);
     // 현재 시각 근처로 스크롤
     const sc=wk.querySelector('.wk-scroll');
     const now=new Date(); const mins=now.getHours()*60+now.getMinutes();
