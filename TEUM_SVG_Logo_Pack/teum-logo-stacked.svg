@@ -1,0 +1,19 @@
+<svg width="900" height="900" viewBox="0 0 900 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>TEUM Stacked Logo</title>
+  <defs>
+    <linearGradient id="navyGrad" x1="332" y1="90" x2="408" y2="362" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#183044"/>
+      <stop offset="1" stop-color="#102334"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="568" y1="90" x2="492" y2="362" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ACDB7"/>
+      <stop offset="1" stop-color="#83BFA7"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(194 0)">
+    <path d="M142 112C142 101.5 153.3 94.9 162.4 100.1L213.4 129.4C221.2 133.9 226 142.2 226 151.2V360.8C226 369.8 221.2 378.1 213.4 382.6L162.4 411.9C153.3 417.1 142 410.5 142 400V112Z" fill="url(#navyGrad)"/>
+    <path d="M370 112C370 101.5 358.7 94.9 349.6 100.1L298.6 129.4C290.8 133.9 286 142.2 286 151.2V360.8C286 369.8 290.8 378.1 298.6 382.6L349.6 411.9C358.7 417.1 370 410.5 370 400V112Z" fill="url(#greenGrad)"/>
+  </g>
+  <text x="450" y="605" text-anchor="middle" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="112" font-weight="400" letter-spacing="48" fill="#102334">TEUM</text>
+  <text x="450" y="680" text-anchor="middle" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="34" font-weight="400" fill="#83BFA7">Turn every gap into progress.</text>
+</svg>

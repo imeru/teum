@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# 압축 원본 / 참고 자료 (저장소에는 추적하지 않음)
+*.zip
+TEUM_Claude_Project/
+TEUM_Product_Documentation/
+
+# 에디터 / 임시
+*.log
+.idea/
+.vscode/
