@@ -209,7 +209,7 @@
     content.appendChild(qa);
 
     if(!tasks.length){
-      content.appendChild(el(`<div class="empty"><div class="big">🌱</div>할 일이 없습니다. 위에 입력해 추가하세요.</div>`));
+      content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />할 일이 없습니다. 위에 입력해 추가하세요.</div>`));
       return;
     }
     const list=el('<div class="tasklist"></div>');

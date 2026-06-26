@@ -1,7 +1,8 @@
 /* 틈(TEUM) service worker — 오프라인 캐시 */
-const CACHE = 'teum-v4';
+const CACHE = 'teum-v5';
 const ASSETS = ['./','./index.html','./app.js','./manifest.json',
-  './icons/icon-192.png','./icons/icon-512.png','./icons/logo-symbol-tight.svg'];
+  './icons/icon-192.png','./icons/icon-512.png','./icons/logo-symbol-tight.svg',
+  './icons/teum-logo-horizontal.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
