@@ -42,7 +42,7 @@
       ],
       projects: [{id:uid(), name:'논문 투고', color:PROJECT_COLORS[0]}],
       sessions: [],
-      settings: { focus:25, short:5, long:15, longEvery:4 },
+      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5 },
       top3: {},
       events: [],
       holidays: [],
@@ -59,7 +59,9 @@
   }
   function migrate(s){
     if(!s.sessions) s.sessions=[];
-    if(!s.settings) s.settings={ focus:25, short:5, long:15, longEvery:4 };
+    if(!s.settings) s.settings={ focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5 };
+    if(s.settings.notify===undefined) s.settings.notify=false;
+    if(s.settings.notifyLead===undefined) s.settings.notifyLead=5;
     if(!s.top3) s.top3={};
     if(!s.events) s.events=[];
     if(!s.holidays) s.holidays=[];
@@ -892,6 +894,10 @@
     pomo.running=false;
     if(currentView==='pomodoro') renderPomodoro(); else paintPomo();
     if(natural && pomo.mode!=='focus') toast('집중 완료! 🍅 잠시 휴식하세요.');
+    if(natural && notifyEnabled()){
+      if(pomo.mode!=='focus') showNotify('🍅 집중 완료','잠시 휴식하세요.','teum-pomo');
+      else showNotify('☕ 휴식 끝','다시 집중해볼까요?','teum-pomo');
+    }
   }
   function logSession(){
     state.sessions.push({id:uid(),taskId:pomo.taskId||'',date:todayStr(),duration:state.settings.focus,at:Date.now()});
@@ -1241,6 +1247,52 @@
     $('#projOverlay').classList.remove('show'); render();
   }
 
+  // ---------- 알림 (포그라운드 — 앱이 켜져 있을 때) ----------
+  const notified = new Set();   // 이번 세션에 이미 띄운 알림 키 (중복 방지)
+  let notifyTimer = null;
+  function notifySupported(){ return typeof window!=='undefined' && 'Notification' in window; }
+  function notifyEnabled(){ return !!(state.settings&&state.settings.notify) && notifySupported() && Notification.permission==='granted'; }
+  function showNotify(title, body, tag){
+    if(!notifySupported() || Notification.permission!=='granted') return;
+    const opts={ body, tag, icon:'icons/icon-192.png', badge:'icons/icon-192.png' };
+    try{
+      if(navigator.serviceWorker && navigator.serviceWorker.ready){
+        navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,opts)).catch(()=>{ try{ new Notification(title,opts); }catch(_){} });
+      } else { new Notification(title,opts); }
+    }catch(_){}
+  }
+  async function enableNotifications(){
+    if(!notifySupported()){ alert('이 브라우저는 알림을 지원하지 않습니다.'); return false; }
+    let perm=Notification.permission;
+    if(perm==='default') perm=await Notification.requestPermission();
+    if(perm!=='granted'){ alert('브라우저에서 알림이 차단되어 있습니다. 사이트 권한에서 허용해 주세요.'); return false; }
+    return true;
+  }
+  function checkReminders(){
+    if(!notifyEnabled()) return;
+    const today=todayStr();
+    const now=new Date(); const nm=now.getHours()*60+now.getMinutes();
+    const lead=(state.settings.notifyLead!=null?state.settings.notifyLead:5);
+    // 트리거 시각이 막 지난 것만(2분 창) 발송 → 앱 켤 때 과거 알림 폭주 방지
+    const fire=(key,trigger,title,body)=>{ if(notified.has(key)) return; if(nm>=trigger && nm-trigger<2){ notified.add(key); showNotify(title,body,key); } };
+    state.tasks.forEach(t=>{
+      if(isDone(t)) return;
+      if(t.block && t.block.date===today)
+        fire('blk:'+t.id+':'+today+':'+t.block.start, t.block.start-lead, '⏰ 곧 시작: '+t.title, `${minToHHMM(t.block.start)} 시작 예정`);
+      if(t.due===today && t.dueTime){ const dm=hhmmToMin(t.dueTime); if(dm!=null) fire('due:'+t.id+':'+today+':'+dm, dm-lead, '📌 마감 임박: '+t.title, `${t.dueTime} 마감`); }
+    });
+    (state.events||[]).forEach(ev=>{
+      if(!ev.allDay && ev.start!=null && eventOccursOn(ev,today))
+        fire('ev:'+ev.id+':'+today+':'+ev.start, ev.start-lead, '📅 일정: '+ev.title, `${minToHHMM(ev.start)} 시작`);
+    });
+  }
+  function startReminderLoop(){
+    if(notifyTimer){ clearInterval(notifyTimer); notifyTimer=null; }
+    if(!notifyEnabled()) return;
+    checkReminders();
+    notifyTimer=setInterval(checkReminders, 30000);
+  }
+
   // ---------- 스마트 추천 (지금 이 틈) ----------
   // 설계 원칙: AI는 추천만, 결정은 사람. 자동 배치/삭제 금지.
   let suggestMin = 15;
@@ -1394,6 +1446,19 @@
         ${authBox}
       </div>
 
+      <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
+        <strong>🔔 알림</strong>
+        <div class="note">앱이 켜져 있을 때 타임블록 시작·마감 시간·일정 시작·뽀모도로 종료를 알려줍니다. (앱을 완전히 닫으면 동작하지 않습니다)</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nt-on" style="width:auto" ${state.settings.notify?'checked':''}> 알림 사용</label>
+        <div class="row" style="align-items:flex-end">
+          <div class="field"><label>미리 알림 (분 전)</label>
+            <select id="nt-lead">${[0,1,3,5,10,15,30].map(m=>`<option value="${m}" ${(state.settings.notifyLead!=null?state.settings.notifyLead:5)===m?'selected':''}>${m===0?'정시':m+'분 전'}</option>`).join('')}</select>
+          </div>
+          <button class="btn" id="nt-test">테스트 알림</button>
+        </div>
+        <div class="note" id="nt-status"></div>
+      </div>
+
       <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
         <strong>📅 공휴일 / 휴무일</strong>
         <div class="note">여기에 등록한 날짜는 '공휴일 제외'를 켠 정기 일정에서 자동으로 빠집니다.</div>
@@ -1423,6 +1488,29 @@
     box.querySelector('#imp').onclick=()=>$('#impFile').click();
     box.querySelector('#impFile').onchange=importJson;
     box.querySelector('#rst').onclick=()=>{ if(confirm('모든 로컬 데이터를 초기화할까요?')){ state=defaultState(); save(); render(); } };
+    // 알림 설정
+    const ntStatus=box.querySelector('#nt-status');
+    const refreshNtStatus=()=>{
+      if(!notifySupported()){ ntStatus.textContent='⚠️ 이 브라우저는 알림을 지원하지 않습니다.'; return; }
+      if(!state.settings.notify){ ntStatus.textContent='알림이 꺼져 있습니다.'; return; }
+      ntStatus.innerHTML = Notification.permission==='granted'
+        ? '상태: <b style="color:var(--green)">켜짐</b> · 앱이 켜져 있을 때만 동작합니다.'
+        : '⚠️ 브라우저 알림 권한이 필요합니다. 사이트 권한에서 허용해 주세요.';
+    };
+    box.querySelector('#nt-on').onchange=async e=>{
+      if(e.target.checked){
+        const ok=await enableNotifications();
+        if(!ok){ e.target.checked=false; state.settings.notify=false; save(); refreshNtStatus(); return; }
+        state.settings.notify=true;
+      } else { state.settings.notify=false; }
+      save(); startReminderLoop(); refreshNtStatus();
+    };
+    box.querySelector('#nt-lead').onchange=e=>{ state.settings.notifyLead=+e.target.value||0; save(); };
+    box.querySelector('#nt-test').onclick=async()=>{
+      const ok=await enableNotifications(); if(!ok) return;
+      showNotify('🔔 틈(TEUM) 알림','알림이 정상 동작합니다.','teum-test');
+    };
+    refreshNtStatus();
     // 공휴일 관리
     const renderHol=()=>{
       const list=box.querySelector('#hol-list'); list.innerHTML='';
@@ -1596,6 +1684,7 @@
   if(gateBtn) gateBtn.onclick=googleLogin;
   setView('plan');
   updateAuthGate();
+  startReminderLoop();
   if(cloud.url&&cloud.key) initSupa();
   // 세션 확인이 지연되면(느린 네트워크 등) 로그인 버튼이라도 보여줌
   setTimeout(()=>{ if(!authChecked){ authChecked=true; updateAuthGate(); } }, 7000);
