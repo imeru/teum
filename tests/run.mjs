@@ -280,6 +280,40 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('태그 버튼 렌더', withTags.$$('#tagNav .nav').some(b => b.textContent.includes('@연구')));
 }
 
+// ───────────────────────── 12) GTD 보드 (칸반) ─────────────────────────
+{
+  section('GTD 보드');
+  const { window, $, $$, getErr } = boot(baseState({
+    tasks: [
+      { id: 'i1', title: '수집함일', status: 'inbox', priority: 4, tags: [], createdAt: 1, updatedAt: 1 },
+      { id: 'n1', title: '다음행동일', status: 'next', priority: 2, due: todayDS, tags: [], createdAt: 2, updatedAt: 1 },
+      { id: 'w1', title: '대기일', status: 'waiting', priority: 3, tags: [], createdAt: 3, updatedAt: 1 },
+      { id: 's1', title: '언젠가일', status: 'someday', priority: 4, tags: [], createdAt: 4, updatedAt: 1 },
+      { id: 'dn', title: '완료일', status: 'done', completedAt: 1, priority: 4, tags: [], createdAt: 5, updatedAt: 1 },
+    ]
+  }), { lastview: 'gtdboard' });
+  ck('런타임 에러 없음', !getErr());
+  ck('GTD 보드 진입(lastview)', $('#viewTitle').textContent === 'GTD 보드');
+  ck('4개 열', $$('.gtdb-col').length === 4);
+  const cols = $$('.gtdb-col');
+  ck('Inbox 열에 수집함일', cols[0].textContent.includes('수집함일'));
+  ck('다음행동 열에 다음행동일', cols[1].textContent.includes('다음행동일'));
+  ck('완료는 보드에 없음', !$('.gtdb').textContent.includes('완료일'));
+  // 빠른 추가 (Inbox 열)
+  const inp = cols[0].querySelector('.gtdb-add input'); inp.value = '새수집';
+  inp.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  ck('열 빠른추가 → inbox 생성', JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.some(t => t.title === '새수집' && t.status === 'inbox'));
+  // 드래그 드롭으로 상태 변경: 수집함일(i1)을 '다음 행동' 열로
+  const dt = { getData: () => 'i1', setData: () => {} };
+  const drop = new window.Event('drop', { bubbles: true }); drop.preventDefault = () => {}; drop.dataTransfer = dt;
+  $$('.gtdb-col')[1].dispatchEvent(drop);
+  ck('드롭 → 상태 next로 변경', JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.find(t => t.id === 'i1').status === 'next');
+  // 사이드바: GTD 보드 단일 메뉴, 개별 메뉴 제거
+  ck('사이드바 GTD 보드 메뉴 존재', !!$('.nav[data-view="gtdboard"]'));
+  ck('개별 inbox 메뉴 제거됨', !$('.nav[data-view="inbox"]'));
+  ck('완료 메뉴 유지', !!$('.nav[data-view="done"]'));
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

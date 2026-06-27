@@ -154,7 +154,7 @@
   function countFor(fn){ return state.tasks.filter(fn).length; }
 
   // 다음 실행 시 복원할 화면(필터 뷰·설정 제외)
-  const RESTORABLE_VIEWS = new Set(['today','suggest','plan','pomodoro','inbox','next','waiting','someday','done','review','weekreview']);
+  const RESTORABLE_VIEWS = new Set(['today','suggest','plan','pomodoro','gtdboard','inbox','next','waiting','someday','done','review','weekreview']);
   function setView(v, filter=null){
     currentView=v; currentFilter=filter;
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active', n.dataset.view===v && !filter));
@@ -173,6 +173,7 @@
     if(currentView==='suggest'){ renderSuggest(); return; }
     if(currentView==='review'){ renderReview(); return; }
     if(currentView==='weekreview'){ renderWeekReview(); return; }
+    if(currentView==='gtdboard'){ renderGtdBoard(); return; }
     if(currentView==='settings'){ renderSettings(); return; }
 
     let tasks, title, sub;
@@ -207,6 +208,59 @@
   }
 
   // sortTasks·추천점수·describeEvent·isPastEvent·설치헬퍼는 logic.js로 분리됨
+
+  // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
+  const GTD_COLS=[
+    {status:'inbox', title:'Inbox', ico:'📥'},
+    {status:'next', title:'다음 행동', ico:'⚡'},
+    {status:'waiting', title:'대기 중', ico:'⏳'},
+    {status:'someday', title:'언젠가', ico:'💭'},
+  ];
+  function gtdCard(t){
+    const pc=t.priority<=3?`p${t.priority}`:'';
+    const card=el(`<div class="gtdb-card ${isOverdue(t.due)?'overdue':''}" draggable="true">
+      <div class="gc-title"><span class="pt-dot ${pc}"></span><span class="gc-t">${esc(t.title)}</span>${subBadgeHTML(t)}</div>
+      <div class="gc-meta"></div>
+    </div>`);
+    const meta=card.querySelector('.gc-meta');
+    if(t.due) meta.appendChild(el(`<span class="chip due ${isOverdue(t.due)?'overdue':''}">📅 ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
+    if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
+    (t.tags||[]).slice(0,2).forEach(tag=>meta.appendChild(el(`<span class="chip tag">${esc(tag)}</span>`)));
+    card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);card.classList.add('dragging');});
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+    card.querySelector('.gc-title').addEventListener('click',()=>openTask(t.id));
+    return card;
+  }
+  function renderGtdBoard(){
+    $('#viewTitle').textContent='GTD 보드';
+    $('#viewSub').textContent='수집함을 분류하고 다음 행동을 정리하세요';
+    document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='gtdboard'));
+    content.innerHTML='';
+    const board=el(`<div class="gtdb"></div>`);
+    GTD_COLS.forEach(col=>{
+      const tasks=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status===col.status));
+      const c=el(`<div class="gtdb-col">
+        <div class="gtdb-head"><span>${col.ico} ${col.title}</span><span class="count">${tasks.length||''}</span></div>
+        <div class="quickadd gtdb-add"><span>＋</span><input placeholder="빠른 추가" /></div>
+        <div class="gtdb-cards"></div>
+      </div>`);
+      const cards=c.querySelector('.gtdb-cards');
+      if(!tasks.length) cards.appendChild(el(`<div class="note" style="padding:8px 2px">비어 있음</div>`));
+      tasks.forEach(t=>cards.appendChild(gtdCard(t)));
+      const inp=c.querySelector('input');
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&inp.value.trim()){ quickAdd(inp.value.trim(), col.status); inp.value=''; renderGtdBoard(); } });
+      // 카드 드롭 → 상태 변경
+      c.addEventListener('dragover',e=>{e.preventDefault();c.classList.add('gtdb-drop');});
+      c.addEventListener('dragleave',e=>{ if(e.target===c) c.classList.remove('gtdb-drop'); });
+      c.addEventListener('drop',e=>{e.preventDefault();c.classList.remove('gtdb-drop');
+        const id=e.dataTransfer.getData('text/plain'); const t=state.tasks.find(x=>x.id===id);
+        if(t && (t.status!==col.status || isDone(t))){ if(isDone(t)) t.completedAt=null; t.status=col.status; t.updatedAt=Date.now(); save(); renderGtdBoard(); renderSidebarCounts(); }
+      });
+      board.appendChild(c);
+    });
+    content.appendChild(board);
+  }
+
   function quickAddBar(){
     const bar=el(`<div class="quickadd">
       <span>➕</span>
@@ -218,8 +272,8 @@
     return bar;
   }
 
-  function quickAdd(raw){
-    let title=raw, priority=4, tags=[], projectId='', due=null, status= currentView==='inbox'?'inbox':'next';
+  function quickAdd(raw, forceStatus){
+    let title=raw, priority=4, tags=[], projectId='', due=null, status= forceStatus || (currentView==='inbox'?'inbox':'next');
     // priority !1..!4
     title=title.replace(/!([1-4])/g,(m,p)=>{priority=+p;return '';});
     // tags @x
@@ -232,9 +286,11 @@
     else if(/내일/.test(title)){ const d=new Date(); d.setDate(d.getDate()+1); due=todayStr(d); title=title.replace(/내일/,''); }
     title=title.replace(/\s+/g,' ').trim();
     if(!title) return;
-    // contextual defaults from current view
-    if(currentView==='waiting') status='waiting';
-    if(currentView==='someday') status='someday';
+    // contextual defaults from current view (forceStatus가 있으면 그것 우선)
+    if(!forceStatus){
+      if(currentView==='waiting') status='waiting';
+      if(currentView==='someday') status='someday';
+    }
     if(currentView==='today' && !due) due=todayStr();
     if(currentFilter&&currentFilter.type==='project') projectId=currentFilter.value;
     if(currentFilter&&currentFilter.type==='tag') tags.push(currentFilter.value);
@@ -1046,12 +1102,11 @@
 
   // ---------- Sidebar counts/nav ----------
   function renderSidebarCounts(){
-    $('#c-today').textContent=countFor(VIEWS.today.filter)||'';
-    $('#c-inbox').textContent=countFor(VIEWS.inbox.filter)||'';
-    $('#c-next').textContent=countFor(VIEWS.next.filter)||'';
-    $('#c-waiting').textContent=countFor(VIEWS.waiting.filter)||'';
-    $('#c-someday').textContent=countFor(VIEWS.someday.filter)||'';
-    const pc=$('#c-pomo'); if(pc) pc.textContent=todaySessions().length||'';
+    const set=(id,n)=>{ const e=$(id); if(e) e.textContent=n||''; };
+    set('#c-today', countFor(VIEWS.today.filter));
+    // GTD 보드: 처리 대기(inbox+다음행동+대기+언젠가) 합계
+    set('#c-gtd', countFor(t=>!isDone(t)&&['inbox','next','waiting','someday'].includes(t.status)));
+    set('#c-pomo', todaySessions().length);
   }
   function todaySessions(){ return (state.sessions||[]).filter(s=>s.date===todayStr()); }
   function sessionsForTask(id){ return (state.sessions||[]).filter(s=>s.taskId===id).length; }
