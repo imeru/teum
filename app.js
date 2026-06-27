@@ -174,6 +174,7 @@
     if(currentView==='review'){ renderReview(); return; }
     if(currentView==='weekreview'){ renderWeekReview(); return; }
     if(currentView==='gtdboard'){ renderGtdBoard(); return; }
+    if(currentView==='guide'){ renderGuide(); return; }
     if(currentView==='settings'){ renderSettings(); return; }
 
     let tasks, title, sub;
@@ -1489,6 +1490,61 @@
     ta.addEventListener('change',()=>{ const v=ta.value.trim(); if(v) state.weekNotes[ws]=v; else delete state.weekNotes[ws]; save(); });
   }
 
+  // ---------- 사용 가이드 ----------
+  function renderGuide(){
+    $('#viewTitle').textContent='사용 가이드';
+    $('#viewSub').textContent='틈을 의미 있는 진전으로 바꾸는 법';
+    document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='guide'));
+    content.innerHTML='';
+    localStorage.setItem('flowdo.guideSeen','1');
+    const steps=[
+      {n:'1', t:'담기 (Capture)', d:'떠오르는 모든 걸 Inbox로. 머릿속을 비우는 게 먼저예요.', view:'gtdboard', btn:'GTD 보드 열기'},
+      {n:'2', t:'분류 (Clarify)', d:'Inbox를 다음 할일·대기 중·언젠가로 끌어 정리. 2분이면 되는 일은 바로 처리.', view:'gtdboard', btn:'GTD 보드 열기'},
+      {n:'3', t:'소요시간 (Estimate)', d:'할 일에 예상 소요(분)를 적어요. 이게 추천·타임블록의 연료가 됩니다.', view:null},
+      {n:'4', t:'배치 (Schedule)', d:'타임박스에서 할 일을 시간표로 드래그. 오늘의 TOP 3를 먼저 정하세요.', view:'plan', btn:'타임박스 열기'},
+      {n:'5', t:'집중 (Focus)', d:'빈 시간이 생기면 “지금 이 틈”에서 딱 맞는 일을 골라 🍅 집중.', view:'suggest', btn:'지금 이 틈 열기'},
+      {n:'6', t:'완료 (Complete)', d:'체크해서 진전을 확인. 큰 일은 체크리스트로 나눠 ☑ 진행을 봅니다.', view:null},
+      {n:'7', t:'돌아보기 (Reflect)', d:'하루는 일일 리뷰로, 한 주는 주간 리뷰로 닫고 다음을 준비하세요.', view:'weekreview', btn:'주간 리뷰 열기'},
+    ];
+    const box=el(`<div class="guide">
+      <div class="guide-hero">
+        <div class="g-tag">시간이 작업보다 먼저</div>
+        <h2>“지금 가진 틈으로 무엇을 해낼까?”</h2>
+        <p>할 일을 쌓는 앱이 아니라, <b>가진 시간을 가장 잘 쓰도록</b> 돕는 앱이에요. 아래 흐름을 따라가 보세요.</p>
+      </div>
+      <div class="guide-steps"></div>
+      <div class="guide-card">
+        <h3>⚡ 빠른 추가 문법</h3>
+        <p class="note">입력창에서 한 줄로:</p>
+        <table class="g-syntax">
+          <tr><td><code>!1</code>~<code>!4</code></td><td>우선순위</td></tr>
+          <tr><td><code>@태그</code></td><td>태그(컨텍스트) 예) @연구 @집</td></tr>
+          <tr><td><code>#이름</code></td><td>프로젝트(맨 뒤, 기존 프로젝트와 일치 시)</td></tr>
+          <tr><td><code>오늘</code>/<code>내일</code></td><td>마감일</td></tr>
+        </table>
+        <p class="note">예) <code>학회 초록 작성 !2 @연구 #논문 투고 오늘</code></p>
+      </div>
+      <div class="guide-card">
+        <h3>🌱 잘 쓰는 5가지 습관</h3>
+        <ol class="g-habits">
+          <li>아침 5분 — 오늘 TOP 3를 정하고 큰 일부터 타임블록 배치</li>
+          <li>모든 일에 예상 소요시간 입력 (추천·계획의 연료)</li>
+          <li>틈이 생기면 “지금 이 틈”부터 열기 — 고민하지 않기</li>
+          <li>밀린 일은 일일 리뷰에서 이월·정리</li>
+          <li>주 1회 주간 리뷰 — 한 주를 닫고 다음 주를 연다</li>
+        </ol>
+      </div>
+      <p class="note" style="text-align:center">한 번에 다 하려 하지 말고, 작은 틈 → 작은 진전의 누적을 믿어요. 명료함·집중·차분함이 곧 기능입니다.</p>
+    </div>`);
+    content.appendChild(box);
+    const sw=box.querySelector('.guide-steps');
+    steps.forEach(s=>{
+      const card=el(`<div class="guide-step"><div class="g-num">${s.n}</div><div class="g-body"><div class="g-t">${esc(s.t)}</div><div class="g-d">${esc(s.d)}</div></div></div>`);
+      if(s.view){ const b=el(`<button class="btn sm">${esc(s.btn)} →</button>`); b.onclick=()=>setView(s.view); card.querySelector('.g-body').appendChild(b); }
+      sw.appendChild(card);
+    });
+  }
+
   // ---------- Settings / Cloud sync ----------
   function renderSettings(){
     $('#viewTitle').textContent='설정';
@@ -1778,9 +1834,10 @@
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(currentView==='settings') renderSettings(); });
   window.addEventListener('appinstalled', ()=>{ deferredInstall=null; toast('앱이 설치되었습니다.'); if(currentView==='settings') renderSettings(); });
 
-  // 첫 실행은 '오늘', 이후엔 마지막으로 본 화면으로 (계획형/실행형 모두 존중)
+  // 첫 실행은 사용 가이드, 이후엔 마지막으로 본 화면(없으면 오늘)
   const lastView = localStorage.getItem('flowdo.lastview');
-  setView(RESTORABLE_VIEWS.has(lastView) ? lastView : 'today');
+  if(!localStorage.getItem('flowdo.guideSeen')) setView('guide');
+  else setView(RESTORABLE_VIEWS.has(lastView) ? lastView : 'today');
   updateAuthGate();
   startReminderLoop();
   if(cloud.url&&cloud.key) initSupa();

@@ -33,6 +33,7 @@ function boot(state, opts = {}) {
   if (state) window.localStorage.setItem('flowdo.state.v1', JSON.stringify(state));
   if (opts.planview) window.localStorage.setItem('flowdo.planview', opts.planview);
   if (opts.lastview) window.localStorage.setItem('flowdo.lastview', opts.lastview);
+  if (!opts.firstRun) window.localStorage.setItem('flowdo.guideSeen', '1'); // 기본은 가이드 본 상태
   let err = null;
   window.addEventListener('error', e => { err = e.error || e.message; });
   try { window.eval(JS); } catch (e) { err = e; }
@@ -312,6 +313,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('사이드바 GTD 보드 메뉴 존재', !!$('.nav[data-view="gtdboard"]'));
   ck('개별 inbox 메뉴 제거됨', !$('.nav[data-view="inbox"]'));
   ck('완료 메뉴 유지', !!$('.nav[data-view="done"]'));
+}
+
+// ───────────────────────── 13) 사용 가이드 ─────────────────────────
+{
+  section('사용 가이드');
+  // 첫 실행이면 가이드 자동 표시
+  const first = boot(baseState(), { firstRun: true });
+  ck('런타임 에러 없음', !first.getErr());
+  ck('첫 실행 → 가이드 자동 표시', first.$('#viewTitle').textContent === '사용 가이드');
+  ck('가이드 본 표시 저장', first.window.localStorage.getItem('flowdo.guideSeen') === '1');
+  // 사이드바에 가이드 메뉴
+  ck('사이드바 가이드 메뉴', !!first.$('.nav[data-view="guide"]'));
+  ck('워크플로 7단계 렌더', first.$$('.guide-step').length === 7);
+  ck('바로가기 버튼 존재', first.$$('.guide-step .btn').length >= 1);
+  // 두 번째 실행(guideSeen 있음)은 가이드 자동 표시 안 함 → 오늘
+  const second = boot(baseState());
+  ck('두 번째 실행은 오늘', second.$('#viewTitle').textContent === '오늘');
+  // 가이드는 lastview로 저장되지 않음(전환해도 reload 시 작업화면 복귀)
+  second.$('.nav[data-view="guide"]').click();
+  ck('가이드는 lastview 미저장', second.window.localStorage.getItem('flowdo.lastview') !== 'guide');
 }
 
 // ───────────────────────── 결과 ─────────────────────────
