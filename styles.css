@@ -313,6 +313,16 @@ input,textarea,select{font-family:inherit}
 .rv-item{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:14px;border-bottom:1px solid var(--border)}
 .rv-item:last-child{border-bottom:none}
 .rv-item .done-dot{color:var(--green)}
+.rv-sec textarea{width:100%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;padding:10px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box}
+.rv-sec textarea:focus{border-color:var(--accent)}
+/* 주간 리뷰 요일별 막대 */
+.wr-bars{display:flex;align-items:flex-end;gap:8px;height:120px}
+.wr-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
+.wr-bar-fill{width:60%;max-width:28px;min-height:0;background:var(--accent);border-radius:6px 6px 0 0;transition:height .2s}
+.wr-bar.today .wr-bar-fill{background:var(--green)}
+.wr-bar-n{font-size:12px;font-weight:700;color:var(--text);min-height:14px}
+.wr-bar-d{font-size:11px;color:var(--muted)}
+.wr-bar.today .wr-bar-d{color:var(--green);font-weight:700}
 
 /* Modal */
 .overlay{position:fixed;inset:0;background:rgba(15,17,23,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}

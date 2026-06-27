@@ -47,6 +47,7 @@
       top3: {},
       events: [],
       holidays: [],
+      weekNotes: {},
       updatedAt: Date.now()
     };
   }
@@ -72,6 +73,7 @@
       if(ev.excludeHolidays===undefined) ev.excludeHolidays=false;
     });
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
+    if(!s.weekNotes) s.weekNotes={};
     return s;
   }
   function loadCfg(){
@@ -167,6 +169,7 @@
     if(currentView==='pomodoro'){ renderPomodoro(); return; }
     if(currentView==='suggest'){ renderSuggest(); return; }
     if(currentView==='review'){ renderReview(); return; }
+    if(currentView==='weekreview'){ renderWeekReview(); return; }
     if(currentView==='settings'){ renderSettings(); return; }
 
     let tasks, title, sub;
@@ -1340,6 +1343,91 @@
         leftSec.appendChild(row);
       });
     }
+  }
+
+  // ---------- 주간 리뷰 (GTD weekly review) ----------
+  let weekReviewStart = startOfWeekDS(todayStr());
+  function renderWeekReview(){
+    $('#viewTitle').textContent='주간 리뷰';
+    $('#viewSub').textContent='한 주를 돌아보고 다음 주를 준비하세요';
+    document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='weekreview'));
+    content.innerHTML='';
+    const ws=weekReviewStart, we=addDaysDS(ws,6);
+    const days=[]; for(let i=0;i<7;i++) days.push(addDaysDS(ws,i));
+    const inWeek=ds=>ds>=ws&&ds<=we;
+    const completed=state.tasks.filter(t=>isDone(t)&&t.completedAt&&inWeek(dateOfTs(t.completedAt)));
+    const weekSessions=(state.sessions||[]).filter(s=>inWeek(s.date));
+    const focusMin=weekSessions.reduce((a,b)=>a+(b.duration||0),0);
+    const activeDays=new Set(completed.map(t=>dateOfTs(t.completedAt)).concat(weekSessions.map(s=>s.date))).size;
+    const leftover=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.due&&t.due<=we));
+    // 요일별 완료 수
+    const perDay=days.map(ds=>completed.filter(t=>dateOfTs(t.completedAt)===ds).length);
+    const maxDay=Math.max(1,...perDay);
+    // 프로젝트별 완료
+    const byProj={}; completed.forEach(t=>{ const k=t.projectId||''; byProj[k]=(byProj[k]||0)+1; });
+    const projRows=Object.entries(byProj).sort((a,b)=>b[1]-a[1]);
+    const sd=parseDS(ws), ed=parseDS(we);
+    const rangeLabel=`${sd.getMonth()+1}.${sd.getDate()} – ${ed.getMonth()+1}.${ed.getDate()}`;
+    const headline=completed.length?`이번 주 ${completed.length}개를 해냈어요 👏`:'이번 주 기록이 아직 없어요. 작은 한 걸음부터.';
+    if(!state.weekNotes) state.weekNotes={};
+    const note=state.weekNotes[ws]||'';
+    const wrap=el(`<div class="review">
+      <div class="rv-head">
+        <button class="btn sm" id="wrPrev">‹</button>
+        <strong style="flex:1;text-align:center">${rangeLabel} 주간</strong>
+        <button class="btn sm" id="wrNext">›</button>
+        <button class="btn sm" id="wrThis">이번 주</button>
+      </div>
+      <div class="rv-headline"><div class="big">${headline}</div><div class="sub">작은 틈이 모여 의미 있는 진전이 됩니다.</div></div>
+      <div class="rv-stats">
+        <div class="rv-stat"><div class="n green">${completed.length}</div><div class="l">완료한 일</div></div>
+        <div class="rv-stat"><div class="n blue">${focusMin}</div><div class="l">집중 시간(분)</div></div>
+        <div class="rv-stat"><div class="n">${weekSessions.length}</div><div class="l">뽀모도로</div></div>
+        <div class="rv-stat"><div class="n">${activeDays}</div><div class="l">활동한 날</div></div>
+      </div>
+      <div class="rv-sec"><h3>📊 요일별 완료</h3><div class="wr-bars"></div></div>
+      <div class="rv-sec" id="wrProj"></div>
+      <div class="rv-sec" id="wrLeft"></div>
+      <div class="rv-sec"><h3>📝 이번 주 회고</h3><textarea id="wrNote" rows="3" placeholder="무엇이 잘 됐고, 다음 주엔 무엇을 바꿔볼까요?">${esc(note)}</textarea></div>
+    </div>`);
+    content.appendChild(wrap);
+    wrap.querySelector('#wrPrev').onclick=()=>{ weekReviewStart=addDaysDS(weekReviewStart,-7); renderWeekReview(); };
+    wrap.querySelector('#wrNext').onclick=()=>{ weekReviewStart=addDaysDS(weekReviewStart,7); renderWeekReview(); };
+    wrap.querySelector('#wrThis').onclick=()=>{ weekReviewStart=startOfWeekDS(todayStr()); renderWeekReview(); };
+    // 요일별 막대
+    const bars=wrap.querySelector('.wr-bars');
+    days.forEach((ds,i)=>{ const dd=parseDS(ds); const h=Math.round(perDay[i]/maxDay*100);
+      const col=el(`<div class="wr-bar ${ds===todayStr()?'today':''}"><div class="wr-bar-fill" style="height:${perDay[i]?Math.max(8,h):0}%"></div><div class="wr-bar-n">${perDay[i]||''}</div><div class="wr-bar-d">${DOW[dd.getDay()]}</div></div>`);
+      bars.appendChild(col);
+    });
+    // 프로젝트별
+    const projSec=wrap.querySelector('#wrProj');
+    projSec.appendChild(el(`<h3>📁 프로젝트별 진행</h3>`));
+    if(!projRows.length) projSec.appendChild(el(`<div class="note">완료한 일이 없습니다.</div>`));
+    projRows.forEach(([pid,cnt])=>{
+      const p=pid?state.projects.find(x=>x.id===pid):null;
+      const name=p?p.name:'프로젝트 없음'; const color=p?p.color:'var(--muted)';
+      projSec.appendChild(el(`<div class="rv-item"><span class="proj-color" style="background:${color}"></span><span style="flex:1">${esc(name)}</span><b>${cnt}</b></div>`));
+    });
+    // 이월
+    const leftSec=wrap.querySelector('#wrLeft');
+    const leftHead=el(`<h3 style="display:flex;justify-content:space-between;align-items:center">🌙 남은 일 <span></span></h3>`);
+    leftSec.appendChild(leftHead);
+    if(!leftover.length){ leftSec.appendChild(el(`<div class="note">남은 일이 없습니다. 깔끔하네요!</div>`)); }
+    else {
+      const nextMon=addDaysDS(ws,7);
+      const btn=el(`<button class="btn sm">전부 다음 주로 이월</button>`);
+      btn.onclick=()=>{ leftover.forEach(t=>{t.due=nextMon;t.updatedAt=Date.now();}); save(); renderWeekReview(); };
+      leftHead.querySelector('span').appendChild(btn);
+      leftover.forEach(t=>{
+        const row=el(`<div class="rv-item"><span style="flex:1">${esc(t.title)} ${isOverdue(t.due)?'<span class="pt-badge">밀림</span>':''}</span><button class="btn sm" data-a="next">다음 주로</button></div>`);
+        row.querySelector('[data-a="next"]').onclick=()=>{ t.due=nextMon; t.updatedAt=Date.now(); save(); renderWeekReview(); };
+        leftSec.appendChild(row);
+      });
+    }
+    // 회고 메모 저장
+    const ta=wrap.querySelector('#wrNote');
+    ta.addEventListener('change',()=>{ const v=ta.value.trim(); if(v) state.weekNotes[ws]=v; else delete state.weekNotes[ws]; save(); });
   }
 
   // ---------- Settings / Cloud sync ----------

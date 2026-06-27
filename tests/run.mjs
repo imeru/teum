@@ -224,6 +224,37 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('데이터 반영', st.tasks[0].title === '옛할일');
 }
 
+// ───────────────────────── 9) 주간 리뷰 ─────────────────────────
+{
+  section('주간 리뷰');
+  const noonTs = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0).getTime();
+  const { window, $, $$, getErr } = boot(baseState({
+    projects: [{ id: 'p1', name: '논문', color: '#16a34a' }],
+    tasks: [
+      { id: 'd1', title: '주간완료A', status: 'done', completedAt: noonTs, projectId: 'p1', priority: 2, tags: [], createdAt: 1, updatedAt: 1 },
+      { id: 'd2', title: '주간완료B', status: 'done', completedAt: noonTs, priority: 3, tags: [], createdAt: 1, updatedAt: 1 },
+      { id: 'lo', title: '남은일', status: 'next', due: todayDS, priority: 2, tags: [], createdAt: 1, updatedAt: 1 },
+    ],
+    sessions: [{ id: 's1', taskId: 'd1', date: todayDS, duration: 25, at: noonTs }],
+  }));
+  $('.nav[data-view="weekreview"]').click();
+  ck('런타임 에러 없음', !getErr());
+  ck('주간 리뷰 렌더', $('.review') && $('#viewTitle').textContent === '주간 리뷰');
+  ck('완료 수 통계 2', $$('.rv-stat .n')[0].textContent === '2');
+  ck('요일 막대 7개', $$('.wr-bar').length === 7);
+  ck('오늘 막대에 완료 수 표시', $$('.wr-bar.today .wr-bar-n')[0] && $$('.wr-bar.today .wr-bar-n')[0].textContent === '2');
+  ck('프로젝트별: 논문 표시', $('#wrProj').textContent.includes('논문'));
+  ck('남은 일: 남은일 표시', $('#wrLeft').textContent.includes('남은일'));
+  // 회고 메모 저장
+  const ta = $('#wrNote'); ta.value = '이번 주 좋았다'; ta.dispatchEvent(new window.Event('change'));
+  const wn = JSON.parse(localStorage.getItem('flowdo.state.v1')).weekNotes;
+  ck('회고 메모 저장됨', Object.values(wn).some(v => v === '이번 주 좋았다'));
+  // 다음 주로 이월
+  $$('#wrLeft button').find(b => b.textContent.includes('다음 주로')).click();
+  const lo = JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.find(t => t.id === 'lo');
+  ck('이월 후 마감일이 다음 주 이후', lo.due > todayDS);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
