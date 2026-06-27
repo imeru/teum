@@ -103,7 +103,7 @@ input,textarea,select{font-family:inherit}
 
 /* Time-box view */
 .tb{display:grid;grid-template-columns:minmax(270px,340px) minmax(0,1fr);gap:16px;height:100%;min-height:0}
-.tb-left{display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding-right:2px;min-height:0}
+.tb-left{display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding-right:10px;min-height:0;scrollbar-gutter:stable}
 .tb-right{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
 .tb-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
 .tb-h{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
