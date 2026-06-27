@@ -168,10 +168,12 @@ input,textarea,select{font-family:inherit}
 .ad-chip{display:block;font-size:11px;color:#fff;border-radius:5px;padding:2px 7px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-weight:600}
 .early-toggle{flex:0 0 auto;border:1px dashed var(--border);background:var(--panel-2);color:var(--muted);border-radius:10px;padding:6px;font-size:12px;font-weight:600;cursor:pointer;width:100%}
 .early-toggle:hover{border-color:var(--accent);color:var(--accent)}
-.cal-nav{display:flex;align-items:center;gap:8px}
-.cal-arrow{font-size:20px;line-height:1;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--panel)}
+.cal-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;row-gap:6px}
+.cal-arrow{font-size:20px;line-height:1;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--panel);flex:0 0 auto}
 .cal-arrow:hover{background:var(--panel-2)}
-.cal-range{font-size:15px;font-weight:700;margin-left:4px}
+.cal-range{font-size:15px;font-weight:700;margin-left:4px;white-space:nowrap}
+.cal-nav .seg{margin-left:auto;flex:0 0 auto}
+.cal-nav .seg button{white-space:nowrap}
 .seg{margin-left:auto;display:inline-flex;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:2px;gap:2px}
 .seg button{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:600;padding:5px 12px;border-radius:8px;cursor:pointer}
 .seg button.on{background:var(--panel);color:var(--accent);box-shadow:var(--shadow)}
