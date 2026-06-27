@@ -196,11 +196,12 @@
 
     tasks=sortTasks(tasks);
     content.innerHTML='';
-    const qa=quickAddBar();
-    content.appendChild(qa);
+    // 완료 뷰는 보관 목적이라 빠른 추가 바를 두지 않음
+    if(currentView!=='done') content.appendChild(quickAddBar());
 
     if(!tasks.length){
-      content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />할 일이 없습니다. 위에 입력해 추가하세요.</div>`));
+      const emptyMsg = currentView==='done' ? '아직 완료한 일이 없습니다.' : '할 일이 없습니다. 위에 입력해 추가하세요.';
+      content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />${emptyMsg}</div>`));
       return;
     }
     const list=el('<div class="tasklist"></div>');

@@ -360,6 +360,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('타임박스 추가 → 다음할일(next)', t && t.status === 'next');
 }
 
+// ───────────────────────── 15) 완료 뷰엔 빠른 추가 없음 ─────────────────────────
+{
+  section('완료 뷰');
+  const { $, getErr } = boot(baseState({
+    tasks: [
+      { id: 'd', title: '완료된일', status: 'done', completedAt: 1, priority: 4, tags: [], createdAt: 1, updatedAt: 1 },
+      { id: 'n', title: '다음일', status: 'next', priority: 4, tags: [], createdAt: 2, updatedAt: 1 },
+    ]
+  }));
+  $('.nav[data-view="done"]').click();
+  ck('런타임 에러 없음', !getErr());
+  ck('완료 뷰에 빠른추가 없음', !$('#quickInput'));
+  // 다른 목록 뷰엔 빠른추가 있음
+  $('.nav[data-view="today"]').click();
+  ck('오늘 뷰엔 빠른추가 있음', !!$('#quickInput'));
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
