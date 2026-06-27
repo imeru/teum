@@ -32,6 +32,7 @@ function boot(state, opts = {}) {
   window.alert = () => {};
   if (state) window.localStorage.setItem('flowdo.state.v1', JSON.stringify(state));
   if (opts.planview) window.localStorage.setItem('flowdo.planview', opts.planview);
+  if (opts.lastview) window.localStorage.setItem('flowdo.lastview', opts.lastview);
   let err = null;
   window.addEventListener('error', e => { err = e.error || e.message; });
   try { window.eval(JS); } catch (e) { err = e; }
@@ -253,6 +254,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   $$('#wrLeft button').find(b => b.textContent.includes('다음 주로')).click();
   const lo = JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.find(t => t.id === 'lo');
   ck('이월 후 마감일이 다음 주 이후', lo.due > todayDS);
+}
+
+// ───────────────────────── 10) 홈(기본 진입) — 마지막 본 화면 기억 ─────────────────────────
+{
+  section('홈/마지막화면');
+  // 첫 실행(저장된 화면 없음) → 오늘
+  const a = boot(baseState());
+  ck('첫 실행 홈=오늘', a.$('#viewTitle').textContent === '오늘');
+  // 마지막 본 화면이 타임박스면 그걸로 복원
+  const b = boot(baseState(), { lastview: 'plan' });
+  ck('마지막=타임박스면 복원', b.$('#viewTitle').textContent === '타임박스');
+  // 화면 이동 시 lastview 저장 (필터 뷰 제외)
+  a.$('.nav[data-view="weekreview"]').click();
+  ck('이동 시 lastview 저장', a.window.localStorage.getItem('flowdo.lastview') === 'weekreview');
 }
 
 // ───────────────────────── 결과 ─────────────────────────

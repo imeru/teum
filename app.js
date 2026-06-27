@@ -153,9 +153,12 @@
 
   function countFor(fn){ return state.tasks.filter(fn).length; }
 
+  // 다음 실행 시 복원할 화면(필터 뷰·설정 제외)
+  const RESTORABLE_VIEWS = new Set(['today','suggest','plan','pomodoro','inbox','next','waiting','someday','done','review','weekreview']);
   function setView(v, filter=null){
     currentView=v; currentFilter=filter;
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active', n.dataset.view===v && !filter));
+    if(!filter && RESTORABLE_VIEWS.has(v)) localStorage.setItem('flowdo.lastview', v);
     closeSidebar();
     render();
   }
@@ -1719,7 +1722,9 @@
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(currentView==='settings') renderSettings(); });
   window.addEventListener('appinstalled', ()=>{ deferredInstall=null; toast('앱이 설치되었습니다.'); if(currentView==='settings') renderSettings(); });
 
-  setView('plan');
+  // 첫 실행은 '오늘', 이후엔 마지막으로 본 화면으로 (계획형/실행형 모두 존중)
+  const lastView = localStorage.getItem('flowdo.lastview');
+  setView(RESTORABLE_VIEWS.has(lastView) ? lastView : 'today');
   updateAuthGate();
   startReminderLoop();
   if(cloud.url&&cloud.key) initSupa();
