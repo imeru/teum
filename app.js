@@ -145,7 +145,7 @@
   const VIEWS = {
     today:{title:'오늘', sub:'오늘 마감·예정된 행동', filter:t=>!isDone(t)&&(t.due===todayStr()||isOverdue(t.due)||(t.block&&t.block.date===todayStr()))},
     inbox:{title:'Inbox', sub:'수집함 — 분류가 필요한 항목', filter:t=>!isDone(t)&&t.status==='inbox'},
-    next:{title:'다음 행동', sub:'바로 실행할 수 있는 일', filter:t=>!isDone(t)&&t.status==='next'},
+    next:{title:'다음 할일', sub:'바로 실행할 수 있는 일', filter:t=>!isDone(t)&&t.status==='next'},
     waiting:{title:'대기 중', sub:'다른 사람·조건을 기다리는 일', filter:t=>!isDone(t)&&t.status==='waiting'},
     someday:{title:'언젠가 / 보류', sub:'지금은 아니지만 잊지 않을 일', filter:t=>!isDone(t)&&t.status==='someday'},
     done:{title:'완료', sub:'최근 완료한 일', filter:t=>isDone(t)},
@@ -212,7 +212,7 @@
   // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
   const GTD_COLS=[
     {status:'inbox', title:'Inbox', ico:'📥'},
-    {status:'next', title:'다음 행동', ico:'⚡'},
+    {status:'next', title:'다음 할일', ico:'⚡'},
     {status:'waiting', title:'대기 중', ico:'⏳'},
     {status:'someday', title:'언젠가', ico:'💭'},
   ];
@@ -233,7 +233,7 @@
   }
   function renderGtdBoard(){
     $('#viewTitle').textContent='GTD 보드';
-    $('#viewSub').textContent='수집함을 분류하고 다음 행동을 정리하세요';
+    $('#viewSub').textContent='수집함을 분류하고 다음 할일을 정리하세요';
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='gtdboard'));
     content.innerHTML='';
     const board=el(`<div class="gtdb"></div>`);
