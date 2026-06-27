@@ -211,11 +211,12 @@
   // sortTasks·추천점수·describeEvent·isPastEvent·설치헬퍼는 logic.js로 분리됨
 
   // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
+  const svgIco=id=>`<svg class="ico-sm"><use href="#i-${id}"/></svg>`;
   const GTD_COLS=[
-    {status:'inbox', title:'Inbox', ico:'📥'},
-    {status:'next', title:'다음 할일', ico:'⚡'},
-    {status:'waiting', title:'대기 중', ico:'⏳'},
-    {status:'someday', title:'언젠가', ico:'💭'},
+    {status:'inbox', title:'Inbox', ico:svgIco('inbox')},
+    {status:'next', title:'다음 할일', ico:svgIco('next')},
+    {status:'waiting', title:'대기 중', ico:svgIco('waiting')},
+    {status:'someday', title:'언젠가', ico:svgIco('someday')},
   ];
   function gtdCard(t){
     const pc=t.priority<=3?`p${t.priority}`:'';

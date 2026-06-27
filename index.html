@@ -10,6 +10,24 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<!-- 아이콘 스프라이트 (미니멀 라인 아이콘, currentColor 상속) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-today" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-suggest" viewBox="0 0 24 24"><path d="M12 3.5l1.7 4.8 4.8 1.7-4.8 1.7L12 16.5l-1.7-4.8L5.5 10l4.8-1.7z"/><path d="M18.6 15.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></symbol>
+  <symbol id="i-pomo" viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V9.5M9.8 2.7h4.4M18.4 7.2l-1.3 1.3"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="5" height="15" rx="1.3"/><rect x="9.5" y="4.5" width="5" height="15" rx="1.3"/><rect x="15.5" y="4.5" width="5" height="15" rx="1.3"/></symbol>
+  <symbol id="i-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.3l2.5 2.5 4.9-5.3"/></symbol>
+  <symbol id="i-review" viewBox="0 0 24 24"><path d="M20.5 14.3A8.2 8.2 0 1 1 9.7 3.5a6.4 6.4 0 0 0 10.8 10.8z"/></symbol>
+  <symbol id="i-week" viewBox="0 0 24 24"><path d="M4 20.5h16"/><rect x="5.5" y="11" width="3.2" height="7.5" rx=".6"/><rect x="10.4" y="6.5" width="3.2" height="12" rx=".6"/><rect x="15.3" y="13.5" width="3.2" height="5" rx=".6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2-2.4 3.6"/><circle cx="12" cy="17" r=".7" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 8h8M16 8h4M4 16h4M12 16h8"/><circle cx="14" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/><path d="M8 12l4 4 4-4M12 4v12"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></symbol>
+  <symbol id="i-waiting" viewBox="0 0 24 24"><path d="M7 4h10M7 20h10M8.5 4v3.2l3.5 3.3 3.5-3.3V4M8.5 20v-3.2l3.5-3.3 3.5 3.3V20"/></symbol>
+  <symbol id="i-someday" viewBox="0 0 24 24"><path d="M7.5 18a4 4 0 0 1-.3-8 5.2 5.2 0 0 1 10 .8A3.6 3.6 0 0 1 16.5 18z"/></symbol>
+</defs></svg>
 <!-- 로그인 게이트 (로그인 전까지 앱 위를 덮음) -->
 <div id="authGate" class="auth-gate show checking">
   <div class="auth-card">
@@ -33,22 +51,22 @@
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="brand"><img class="brand-mark" src="icons/logo-symbol-tight.svg" alt="TEUM" /> TEUM</div>
-    <button class="nav" data-view="today"><span class="ico">📅</span> 오늘 <span class="count" id="c-today"></span></button>
-    <button class="nav" data-view="suggest"><span class="ico">✨</span> 지금 이 틈</button>
-    <button class="nav" data-view="plan"><span class="ico">🗓️</span> 타임박스</button>
-    <button class="nav" data-view="pomodoro"><span class="ico">🍅</span> 뽀모도로 <span class="count" id="c-pomo"></span></button>
+    <button class="nav" data-view="today"><span class="ico"><svg><use href="#i-today"/></svg></span> 오늘 <span class="count" id="c-today"></span></button>
+    <button class="nav" data-view="suggest"><span class="ico"><svg><use href="#i-suggest"/></svg></span> 지금 이 틈</button>
+    <button class="nav" data-view="plan"><span class="ico"><svg><use href="#i-plan"/></svg></span> 타임박스</button>
+    <button class="nav" data-view="pomodoro"><span class="ico"><svg><use href="#i-pomo"/></svg></span> 뽀모도로 <span class="count" id="c-pomo"></span></button>
 
     <div class="nav-section">GTD</div>
-    <button class="nav" data-view="gtdboard"><span class="ico">🗂️</span> GTD 보드 <span class="count" id="c-gtd"></span></button>
-    <button class="nav" data-view="done"><span class="ico">✅</span> 완료</button>
+    <button class="nav" data-view="gtdboard"><span class="ico"><svg><use href="#i-board"/></svg></span> GTD 보드 <span class="count" id="c-gtd"></span></button>
+    <button class="nav" data-view="done"><span class="ico"><svg><use href="#i-done"/></svg></span> 완료</button>
 
     <div class="nav-section">돌아보기</div>
-    <button class="nav" data-view="review"><span class="ico">🌙</span> 일일 리뷰</button>
-    <button class="nav" data-view="weekreview"><span class="ico">📈</span> 주간 리뷰</button>
+    <button class="nav" data-view="review"><span class="ico"><svg><use href="#i-review"/></svg></span> 일일 리뷰</button>
+    <button class="nav" data-view="weekreview"><span class="ico"><svg><use href="#i-week"/></svg></span> 주간 리뷰</button>
 
     <div class="nav-section">프로젝트</div>
     <div id="projectNav"></div>
-    <button class="nav" id="addProjectBtn"><span class="ico">＋</span> 프로젝트 추가</button>
+    <button class="nav" id="addProjectBtn"><span class="ico"><svg><use href="#i-plus"/></svg></span> 프로젝트 추가</button>
 
     <div id="tagSection">
       <div class="nav-section">태그</div>
@@ -56,8 +74,8 @@
     </div>
 
     <div style="margin-top:auto"></div>
-    <button class="nav" data-view="guide"><span class="ico">❓</span> 사용 가이드</button>
-    <button class="nav" data-view="settings"><span class="ico">⚙️</span> 설정 <span class="badge-sync" id="syncBadge">로컬</span></button>
+    <button class="nav" data-view="guide"><span class="ico"><svg><use href="#i-guide"/></svg></span> 사용 가이드</button>
+    <button class="nav" data-view="settings"><span class="ico"><svg><use href="#i-settings"/></svg></span> 설정 <span class="badge-sync" id="syncBadge">로컬</span></button>
   </aside>
   <div class="backdrop" id="backdrop"></div>
 
