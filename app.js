@@ -1069,7 +1069,8 @@
   function renderTagNav(){
     const nav=$('#tagNav'); nav.innerHTML='';
     const tags=[...new Set(state.tasks.flatMap(t=>t.tags||[]))].sort();
-    if(!tags.length){ nav.appendChild(el(`<div class="note" style="padding:2px 12px">아직 태그 없음</div>`)); return; }
+    const sec=$('#tagSection'); if(sec) sec.style.display=tags.length?'':'none';
+    if(!tags.length) return; // 태그 없으면 섹션 숨김
     tags.slice(0,12).forEach(tag=>{
       const b=el(`<button class="nav"><span class="ico">#</span> ${esc(tag)}</button>`);
       b.classList.toggle('active',currentFilter&&currentFilter.type==='tag'&&currentFilter.value===tag);

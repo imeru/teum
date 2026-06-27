@@ -270,6 +270,16 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('이동 시 lastview 저장', a.window.localStorage.getItem('flowdo.lastview') === 'weekreview');
 }
 
+// ───────────────────────── 11) 빈 태그 섹션 숨김 ─────────────────────────
+{
+  section('태그 섹션');
+  const noTags = boot(baseState({ tasks: [{ id: 'a', title: '태그없음', status: 'next', priority: 4, tags: [], createdAt: 1, updatedAt: 1 }] }));
+  ck('태그 0개면 섹션 숨김', noTags.$('#tagSection').style.display === 'none');
+  const withTags = boot(baseState({ tasks: [{ id: 'a', title: '태그있음', status: 'next', priority: 4, tags: ['@연구'], createdAt: 1, updatedAt: 1 }] }));
+  ck('태그 있으면 섹션 표시', withTags.$('#tagSection').style.display !== 'none');
+  ck('태그 버튼 렌더', withTags.$$('#tagNav .nav').some(b => b.textContent.includes('@연구')));
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
