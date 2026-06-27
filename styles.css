@@ -102,7 +102,7 @@ input,textarea,select{font-family:inherit}
 .auth-gate:not(.checking) .auth-checking{display:none}
 
 /* Time-box view */
-.tb{display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:16px;height:100%;min-height:0}
+.tb{display:grid;grid-template-columns:minmax(270px,340px) minmax(0,1fr);gap:16px;height:100%;min-height:0}
 .tb-left{display:flex;flex-direction:column;gap:14px;overflow-y:auto;padding-right:2px;min-height:0}
 .tb-right{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
 .tb-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
@@ -408,6 +408,14 @@ pre{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;
 
 /* Mobile */
 .mobi-tab{display:none}
+/* 중간 폭: 사이드바·좌측 컬럼을 줄여 달력(오른쪽)에 공간을 더 준다 */
+@media (min-width:821px) and (max-width:1080px){
+  .app{grid-template-columns:184px 1fr}
+  .sidebar{padding:10px 6px}
+  .tb{grid-template-columns:minmax(232px,288px) minmax(0,1fr);gap:12px}
+  .content{padding:20px 18px 48px}
+  .topbar{padding:16px 18px}
+}
 @media (max-width:820px){
   .app{grid-template-columns:1fr}
   .sidebar{position:fixed;inset:0 auto 0 0;width:78%;max-width:300px;z-index:40;transform:translateX(-100%);transition:.2s;box-shadow:0 0 40px rgba(0,0,0,.3)}
