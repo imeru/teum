@@ -24,6 +24,7 @@ function fmtDue(s){
 function isOverdue(s){ if(!s) return false; return s < todayStr(); }
 function minToHHMM(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
 function hhmmToMin(s){ if(!s) return null; const[a,b]=s.split(':').map(Number); return a*60+b; }
+function isDone(t){ return t.status==='done'; }
 function startOfWeek(d){ const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-x.getDay()); return x; }
 function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
 // 월 n번째 요일 날짜 (ord: 1~5, -1=마지막)

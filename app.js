@@ -148,7 +148,6 @@
     someday:{title:'언젠가 / 보류', sub:'지금은 아니지만 잊지 않을 일', filter:t=>!isDone(t)&&t.status==='someday'},
     done:{title:'완료', sub:'최근 완료한 일', filter:t=>isDone(t)},
   };
-  function isDone(t){ return t.status==='done'; }
 
   function countFor(fn){ return state.tasks.filter(fn).length; }
 
@@ -201,17 +200,7 @@
     content.appendChild(list);
   }
 
-  function sortTasks(ts){
-    return ts.slice().sort((a,b)=>{
-      if(isDone(a)!==isDone(b)) return isDone(a)?1:-1;
-      if(isDone(a)) return (b.completedAt||0)-(a.completedAt||0);
-      const ov=(isOverdue(b.due)?1:0)-(isOverdue(a.due)?1:0); if(ov) return ov;
-      if(a.priority!==b.priority) return a.priority-b.priority;
-      const ad=a.due||'9999', bd=b.due||'9999'; if(ad!==bd) return ad<bd?-1:1;
-      return a.createdAt-b.createdAt;
-    });
-  }
-
+  // sortTasks·추천점수·describeEvent·isPastEvent·설치헬퍼는 logic.js로 분리됨
   function quickAddBar(){
     const bar=el(`<div class="quickadd">
       <span>➕</span>
@@ -933,36 +922,7 @@
   let evColor='#0d9488';
   let editingEventId=null;
   let showPastEvents=false;
-  const ORD_LABEL={1:'첫째',2:'둘째',3:'셋째',4:'넷째',5:'다섯째','-1':'마지막'};
-  function describeEvent(ev){
-    let s;
-    if(ev.freq==='once'){
-      const range=ev.endDate&&ev.endDate>ev.startDate?` ~ ${ev.endDate}`:'';
-      return ev.allDay ? `${ev.startDate}${range} · 종일`
-        : `${ev.startDate}${range} · ${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}`;
-    }
-    if((ev.freq||'weekly')==='weekly'){
-      const dl=ev.days.slice().sort((a,b)=>a-b).map(d=>'일월화수목금토'[d]).join('·');
-      s=(ev.interval>1?`${ev.interval}주마다 `:'매주 ')+dl;
-    } else if(ev.monthMode==='weekday'){
-      s=(ev.interval>1?`${ev.interval}개월마다 `:'매월 ')+`${ORD_LABEL[ev.ordinal]||''} ${'일월화수목금토'[ev.weekday]}요일`;
-    } else {
-      const dom=new Date(ev.startDate+'T00:00:00').getDate();
-      s=(ev.interval>1?`${ev.interval}개월마다 `:'매월 ')+`${dom}일`;
-    }
-    s+=` · ${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}`;
-    if(ev.endMode==='date'&&ev.endDate) s+=` · ~${ev.endDate}`;
-    if(ev.endMode==='count'&&ev.count) s+=` · ${ev.count}회`;
-    if(ev.excludeHolidays) s+=' · 공휴일 제외';
-    return s;
-  }
-  // 완전히 지난 일정인가 (목록에서 숨김 대상 — 달력에는 그대로 남음)
-  function isPastEvent(ev){
-    const t=todayStr();
-    if(ev.freq==='once') return (ev.endDate||ev.startDate) < t;
-    if(ev.endMode==='date'&&ev.endDate) return ev.endDate < t;
-    return false; // 종료 없는/횟수 종료 정기 일정은 진행 중으로 간주
-  }
+  // describeEvent·isPastEvent → logic.js
   function renderEventList(){
     const host=$('#eventList'); if(!host) return; host.innerHTML='';
     const all=(state.events||[]).slice().sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||'')||((a.start||0)-(b.start||0)));
@@ -1263,42 +1223,13 @@
   }
 
   // ---------- PWA 설치 ----------
-  function isStandalone(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true; }
-  function installInstructions(){
-    const ua=navigator.userAgent;
-    if(/iphone|ipad|ipod/i.test(ua)) return 'Safari 하단 공유 버튼(􀈂)을 누르고 "홈 화면에 추가"를 선택하세요.';
-    if(/macintosh|mac os x/i.test(ua) && /safari/i.test(ua) && !/chrome|crios|edg|chromium/i.test(ua))
-      return 'Safari 메뉴 → 파일 → "Dock에 추가…", 또는 주소창 옆 공유 버튼 → "Dock에 추가"를 선택하세요.';
-    if(/android/i.test(ua)) return 'Chrome 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 선택하세요.';
-    return '브라우저 주소창 오른쪽의 설치 아이콘(⊕/모니터 모양)을 누르거나, 메뉴에서 "앱 설치"를 선택하세요.';
-  }
+  // isStandalone·installInstructions → logic.js
 
   // ---------- 스마트 추천 (지금 이 틈) ----------
   // 설계 원칙: AI는 추천만, 결정은 사람. 자동 배치/삭제 금지.
+  // 추천 점수(suggestScore 등)는 logic.js
   let suggestMin = 15;
   const GAP_OPTS = [5,10,15,30,60];
-  // 추천 점수: 틈 적합도 + 마감 긴급도 + 우선순위 가중 합
-  function daysUntil(due){ if(!due) return null; return Math.round((parseDS(due)-parseDS(todayStr()))/86400000); }
-  function urgencyScore(t){
-    const d=daysUntil(t.due);
-    if(d==null) return 0.1;
-    if(d<0) return 1.0; if(d===0) return 0.9; if(d===1) return 0.7;
-    if(d<=3) return 0.55; if(d<=7) return 0.35; return 0.15;
-  }
-  function prioScore(t){ return ({1:1,2:0.75,3:0.5,4:0.3})[t.priority]||0.3; }
-  function fitScore(t,gap){ return t.estimate ? Math.min(1, t.estimate/gap) : 0.45; } // 미입력=중립
-  function suggestScore(t,gap){
-    const score = 0.38*prioScore(t) + 0.37*urgencyScore(t) + 0.25*fitScore(t,gap);
-    const d=daysUntil(t.due);
-    let reason;
-    if(d!=null&&d<0) reason='지난 마감';
-    else if(d===0) reason='오늘 마감';
-    else if(t.priority<=2) reason='높은 우선순위';
-    else if(t.estimate&&t.estimate/gap>=0.7) reason='딱 맞는 시간';
-    else if(d!=null&&d<=3) reason='마감 임박';
-    else reason='틈에 적합';
-    return {score,reason};
-  }
   function renderSuggest(){
     $('#viewTitle').textContent='지금 이 틈';
     $('#viewSub').textContent='지금 가진 시간으로 할 수 있는 가장 좋은 일';
