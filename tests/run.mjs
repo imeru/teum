@@ -335,6 +335,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('가이드는 lastview 미저장', second.window.localStorage.getItem('flowdo.lastview') !== 'guide');
 }
 
+// ───────────────────────── 14) 타임박스 풀 = 다음 할일만 ─────────────────────────
+{
+  section('타임박스 풀');
+  const { window, $, $$, getErr } = boot(baseState({
+    tasks: [
+      { id: 'nx', title: '다음할일카드', status: 'next', priority: 3, tags: [], createdAt: 1, updatedAt: 1 },
+      { id: 'ib', title: '수집함카드', status: 'inbox', priority: 3, tags: [], createdAt: 2, updatedAt: 1 },
+      { id: 'wt', title: '대기카드', status: 'waiting', priority: 3, tags: [], createdAt: 3, updatedAt: 1 },
+    ]
+  }), { planview: 'day' });
+  $('.nav[data-view="plan"]').click();
+  const poolText = () => $('#pool').textContent;
+  ck('런타임 에러 없음', !getErr());
+  ck('풀에 다음할일 노출', poolText().includes('다음할일카드'));
+  ck('풀에 Inbox 미노출', !poolText().includes('수집함카드'));
+  ck('풀에 대기 미노출', !poolText().includes('대기카드'));
+  // 타임박스 빠른추가 → next 상태로 생성
+  const pq = $('#poolQuick'); pq.value = '타임박스추가';
+  pq.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  const t = JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.find(x => x.title === '타임박스추가');
+  ck('타임박스 추가 → 다음할일(next)', t && t.status === 'next');
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

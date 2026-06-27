@@ -655,7 +655,8 @@
   function renderPool(){
     const pool=$('#pool'); pool.innerHTML='';
     const top3ids=getTop3().filter(Boolean);
-    const avail=state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(!t.block||t.block.date!==planDate)&&!top3ids.includes(t.id));
+    // 타임박스에는 '다음 할일(next)'만 배치 (Inbox·대기·언젠가는 GTD 보드에서 분류 후 노출)
+    const avail=state.tasks.filter(t=>!isDone(t)&&t.status==='next'&&(!t.block||t.block.date!==planDate)&&!top3ids.includes(t.id));
     $('#poolCount').textContent=avail.length?`${avail.length}개`:'';
     const overdue=avail.filter(t=>isOverdue(t.due));
     if(overdue.length){
@@ -667,7 +668,12 @@
     const undated=sortTasks(avail.filter(t=>!dated.includes(t)));
     addPoolGroup(pool, planDate===todayStr()?'오늘 할 일':'예정 할 일', dated);
     addPoolGroup(pool,'기본 할 일', undated);
-    if(!avail.length) pool.appendChild(el(`<div class="note" style="padding:10px 2px">배치할 할 일이 없습니다. 위에서 추가하세요.</div>`));
+    if(!avail.length){
+      const inboxN=countFor(t=>!isDone(t)&&t.status==='inbox');
+      const msg=inboxN ? `배치할 ‘다음 할일’이 없습니다. GTD 보드에서 Inbox ${inboxN}개를 ‘다음 할일’로 분류하면 여기 나타나요.`
+        : '배치할 할 일이 없습니다. 위에서 추가하세요.';
+      pool.appendChild(el(`<div class="note" style="padding:10px 2px">${msg}</div>`));
+    }
     // 캘린더/TOP3 카드를 여기로 끌어다 놓으면 배치·우선순위 해제
     pool.ondragover=e=>{e.preventDefault();pool.classList.add('pool-dragover');};
     pool.ondragleave=e=>{ if(e.target===pool) pool.classList.remove('pool-dragover'); };
