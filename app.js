@@ -1135,7 +1135,7 @@
     const sec=$('#tagSection'); if(sec) sec.style.display=tags.length?'':'none';
     if(!tags.length) return; // 태그 없으면 섹션 숨김
     tags.slice(0,12).forEach(tag=>{
-      const b=el(`<button class="nav"><span class="ico">#</span> ${esc(tag)}</button>`);
+      const b=el(`<button class="nav"><span class="ico"><svg><use href="#i-tag"/></svg></span> ${esc(tag)}</button>`);
       b.classList.toggle('active',currentFilter&&currentFilter.type==='tag'&&currentFilter.value===tag);
       b.onclick=()=>setView('tag',{type:'tag',value:tag});
       makeNavDrop(b,t=>{ if(!t.tags)t.tags=[]; if(!t.tags.includes(tag))t.tags.push(tag); });
@@ -1392,18 +1392,18 @@
     wrap.querySelector('#rvToday').onclick=()=>{reviewDate=todayStr();renderReview();};
 
     const doneSec=wrap.querySelector('#rvDone');
-    doneSec.appendChild(el(`<h3>✅ 완료한 일</h3>`));
+    doneSec.appendChild(el(`<h3>${svgIco('done')} 완료한 일</h3>`));
     if(!completed.length) doneSec.appendChild(el(`<div class="note">이 날 완료한 일이 없습니다.</div>`));
     completed.forEach(t=>doneSec.appendChild(el(`<div class="rv-item"><span class="done-dot">✓</span> ${esc(t.title)}</div>`)));
 
     const leftSec=wrap.querySelector('#rvLeft');
-    const leftHead=el(`<h3 style="display:flex;justify-content:space-between;align-items:center">🌙 남은 일 <span></span></h3>`);
+    const leftHead=el(`<h3 style="display:flex;justify-content:space-between;align-items:center"><span style="display:inline-flex;align-items:center;gap:6px">${svgIco('review')} 남은 일</span><span class="h3-act"></span></h3>`);
     leftSec.appendChild(leftHead);
     if(!leftover.length){ leftSec.appendChild(el(`<div class="note">남은 일이 없습니다. 깔끔하네요!</div>`)); }
     else {
       const btn=el(`<button class="btn sm">전부 내일로 이월</button>`);
       btn.onclick=()=>{ const x=new Date(reviewDate);x.setDate(x.getDate()+1); const nd=todayStr(x); leftover.forEach(t=>{t.due=nd;t.updatedAt=Date.now();}); save(); renderReview(); };
-      leftHead.querySelector('span').appendChild(btn);
+      leftHead.querySelector('.h3-act').appendChild(btn);
       leftover.forEach(t=>{
         const row=el(`<div class="rv-item"><span style="flex:1">${esc(t.title)} ${isOverdue(t.due)?'<span class="pt-badge">밀림</span>':''}</span><button class="btn sm" data-a="tomorrow">내일로</button></div>`);
         row.querySelector('[data-a="tomorrow"]').onclick=()=>{ const x=new Date(reviewDate);x.setDate(x.getDate()+1); t.due=todayStr(x); t.updatedAt=Date.now(); save(); renderReview(); };
@@ -1452,10 +1452,10 @@
         <div class="rv-stat"><div class="n">${weekSessions.length}</div><div class="l">뽀모도로</div></div>
         <div class="rv-stat"><div class="n">${activeDays}</div><div class="l">활동한 날</div></div>
       </div>
-      <div class="rv-sec"><h3>📊 요일별 완료</h3><div class="wr-bars"></div></div>
+      <div class="rv-sec"><h3>${svgIco('week')} 요일별 완료</h3><div class="wr-bars"></div></div>
       <div class="rv-sec" id="wrProj"></div>
       <div class="rv-sec" id="wrLeft"></div>
-      <div class="rv-sec"><h3>📝 이번 주 회고</h3><textarea id="wrNote" rows="3" placeholder="무엇이 잘 됐고, 다음 주엔 무엇을 바꿔볼까요?">${esc(note)}</textarea></div>
+      <div class="rv-sec"><h3>${svgIco('note')} 이번 주 회고</h3><textarea id="wrNote" rows="3" placeholder="무엇이 잘 됐고, 다음 주엔 무엇을 바꿔볼까요?">${esc(note)}</textarea></div>
     </div>`);
     content.appendChild(wrap);
     wrap.querySelector('#wrPrev').onclick=()=>{ weekReviewStart=addDaysDS(weekReviewStart,-7); renderWeekReview(); };
@@ -1469,7 +1469,7 @@
     });
     // 프로젝트별
     const projSec=wrap.querySelector('#wrProj');
-    projSec.appendChild(el(`<h3>📁 프로젝트별 진행</h3>`));
+    projSec.appendChild(el(`<h3>${svgIco('folder')} 프로젝트별 진행</h3>`));
     if(!projRows.length) projSec.appendChild(el(`<div class="note">완료한 일이 없습니다.</div>`));
     projRows.forEach(([pid,cnt])=>{
       const p=pid?state.projects.find(x=>x.id===pid):null;
@@ -1478,14 +1478,14 @@
     });
     // 이월
     const leftSec=wrap.querySelector('#wrLeft');
-    const leftHead=el(`<h3 style="display:flex;justify-content:space-between;align-items:center">🌙 남은 일 <span></span></h3>`);
+    const leftHead=el(`<h3 style="display:flex;justify-content:space-between;align-items:center"><span style="display:inline-flex;align-items:center;gap:6px">${svgIco('review')} 남은 일</span><span class="h3-act"></span></h3>`);
     leftSec.appendChild(leftHead);
     if(!leftover.length){ leftSec.appendChild(el(`<div class="note">남은 일이 없습니다. 깔끔하네요!</div>`)); }
     else {
       const nextMon=addDaysDS(ws,7);
       const btn=el(`<button class="btn sm">전부 다음 주로 이월</button>`);
       btn.onclick=()=>{ leftover.forEach(t=>{t.due=nextMon;t.updatedAt=Date.now();}); save(); renderWeekReview(); };
-      leftHead.querySelector('span').appendChild(btn);
+      leftHead.querySelector('.h3-act').appendChild(btn);
       leftover.forEach(t=>{
         const row=el(`<div class="rv-item"><span style="flex:1">${esc(t.title)} ${isOverdue(t.due)?'<span class="pt-badge">밀림</span>':''}</span><button class="btn sm" data-a="next">다음 주로</button></div>`);
         row.querySelector('[data-a="next"]').onclick=()=>{ t.due=nextMon; t.updatedAt=Date.now(); save(); renderWeekReview(); };
