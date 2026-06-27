@@ -212,6 +212,7 @@
 
   // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
   const svgIco=id=>`<svg class="ico-sm"><use href="#i-${id}"/></svg>`;
+  const cic=id=>`<svg class="cic"><use href="#i-${id}"/></svg>`; // 칩용 작은 라인 아이콘
   const GTD_COLS=[
     {status:'inbox', title:'Inbox', ico:svgIco('inbox')},
     {status:'next', title:'다음 할일', ico:svgIco('next')},
@@ -225,7 +226,7 @@
       <div class="gc-meta"></div>
     </div>`);
     const meta=card.querySelector('.gc-meta');
-    if(t.due) meta.appendChild(el(`<span class="chip due ${isOverdue(t.due)?'overdue':''}">📅 ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
+    if(t.due) meta.appendChild(el(`<span class="chip due ${isOverdue(t.due)?'overdue':''}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
     (t.tags||[]).slice(0,2).forEach(tag=>meta.appendChild(el(`<span class="chip tag">${esc(tag)}</span>`)));
     card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);card.classList.add('dragging');});
@@ -243,7 +244,7 @@
       const tasks=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status===col.status));
       const c=el(`<div class="gtdb-col">
         <div class="gtdb-head"><span>${col.ico} ${col.title}</span><span class="count">${tasks.length||''}</span></div>
-        <div class="quickadd gtdb-add"><span>＋</span><input placeholder="빠른 추가" /></div>
+        <div class="quickadd gtdb-add"><span>${cic('plus')}</span><input placeholder="빠른 추가" /></div>
         <div class="gtdb-cards"></div>
       </div>`);
       const cards=c.querySelector('.gtdb-cards');
@@ -265,7 +266,7 @@
 
   function quickAddBar(){
     const bar=el(`<div class="quickadd">
-      <span>➕</span>
+      <span>${cic('plus')}</span>
       <input id="quickInput" placeholder="빠른 추가 —  예) 보고서 작성 !1 @연구 #논문 투고 오늘" />
       <span class="hint">!우선순위 · @태그 · #프로젝트 · 오늘/내일</span>
     </div>`);
@@ -309,19 +310,19 @@
         <div class="task-meta"></div>
       </div>
       <div class="task-actions">
-        <button class="iconbtn" data-act="pomo" title="뽀모도로 시작">🍅</button>
-        <button class="iconbtn" data-act="edit" title="편집">✏️</button>
-        <button class="iconbtn" data-act="del" title="삭제">🗑️</button>
+        <button class="iconbtn" data-act="pomo" title="뽀모도로 시작">${svgIco('pomo')}</button>
+        <button class="iconbtn" data-act="edit" title="편집">${svgIco('note')}</button>
+        <button class="iconbtn" data-act="del" title="삭제">${svgIco('trash')}</button>
       </div>
     </div>`);
     node.querySelector('.task-title').textContent=t.title;
     const sb=subBadgeEl(t); if(sb) node.querySelector('.task-title').appendChild(sb);
     const meta=node.querySelector('.task-meta');
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
-    if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">📅 ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`)); }
-    if(t.block){ meta.appendChild(el(`<span class="chip block">🗓️ ${t.block.date===todayStr()?'오늘 ':''}${minToHHMM(t.block.start)}</span>`)); }
-    if(t.estimate){ meta.appendChild(el(`<span class="chip">⏱ ${t.estimate}분</span>`)); }
-    const sc=sessionsForTask(t.id); if(sc) meta.appendChild(el(`<span class="chip pomo">🍅 ${sc}</span>`));
+    if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`)); }
+    if(t.block){ meta.appendChild(el(`<span class="chip block">${cic('clock')} ${t.block.date===todayStr()?'오늘 ':''}${minToHHMM(t.block.start)}</span>`)); }
+    if(t.estimate){ meta.appendChild(el(`<span class="chip">${cic('clock')} ${t.estimate}분</span>`)); }
+    const sc=sessionsForTask(t.id); if(sc) meta.appendChild(el(`<span class="chip pomo">${cic('pomo')} ${sc}</span>`));
     (t.tags||[]).forEach(tag=>{ const c=el(`<span class="chip tag">${esc(tag)}</span>`); c.addEventListener('click',e=>{e.stopPropagation();setView('tag',{type:'tag',value:tag});}); meta.appendChild(c); });
 
     node.querySelector('.check').addEventListener('click',e=>{e.stopPropagation();toggleDone(t.id);});
@@ -367,19 +368,19 @@
       <div class="tb-left">
         <div class="tb-card"><div id="miniCal"></div></div>
         <div class="tb-card">
-          <div class="tb-h"><span>🎯 오늘의 우선순위 TOP 3</span></div>
+          <div class="tb-h"><span>${cic('target')} 오늘의 우선순위 TOP 3</span></div>
           <div id="top3"></div>
         </div>
         <div class="tb-card">
-          <div class="tb-h"><span>🧠 할 일</span><span id="poolCount" style="text-transform:none;font-weight:600"></span></div>
+          <div class="tb-h"><span>${cic('list')} 할 일</span><span id="poolCount" style="text-transform:none;font-weight:600"></span></div>
           <div class="quickadd" style="margin-bottom:10px">
-            <span>➕</span>
+            <span>${cic('plus')}</span>
             <input id="poolQuick" placeholder="빠른 추가 — 예) 자료 정리 !1 @연구" />
           </div>
           <div id="pool"></div>
         </div>
         <div class="tb-card">
-          <div class="tb-h"><span>📅 일정</span><span style="display:flex;gap:6px"><button class="btn sm" id="addEventBtn">＋ 정기</button><button class="btn sm" id="addEventOnceBtn">＋ 일반</button></span></div>
+          <div class="tb-h"><span>${cic('cal')} 일정</span><span style="display:flex;gap:6px"><button class="btn sm" id="addEventBtn">＋ 정기</button><button class="btn sm" id="addEventOnceBtn">＋ 일반</button></span></div>
           <div id="eventList"></div>
         </div>
       </div>
@@ -599,7 +600,7 @@
         });
         if(items.length>room) host.appendChild(el(`<div class="mo-more">+${items.length-room}</div>`));
         const hasRecur=(state.events||[]).some(ev=>ev.freq!=='once'&&eventOccursOn(ev,ds));
-        if(hasRecur) cell.querySelector('.mo-d').insertAdjacentHTML('afterbegin','<span class="mo-evdot">🔁</span> ');
+        if(hasRecur) cell.querySelector('.mo-d').insertAdjacentHTML('afterbegin',`<span class="mo-evdot">${cic('repeat')}</span> `);
         cell.onclick=()=>{ planDate=ds; setPlanView('day'); };
         makeDayDrop(cell,ds);
         row.appendChild(cell);
@@ -661,7 +662,7 @@
     $('#poolCount').textContent=avail.length?`${avail.length}개`:'';
     const overdue=avail.filter(t=>isOverdue(t.due));
     if(overdue.length){
-      const banner=el(`<div class="overdue-banner"><span>⚠ 밀린 일정 ${overdue.length}개</span><button>오늘로 이월 →</button></div>`);
+      const banner=el(`<div class="overdue-banner"><span>${cic('alert')} 밀린 일정 ${overdue.length}개</span><button>오늘로 이월 →</button></div>`);
       banner.querySelector('button').onclick=()=>{ overdue.forEach(t=>{t.due=todayStr();t.updatedAt=Date.now();}); save(); renderPlan(); };
       pool.appendChild(banner);
     }
@@ -731,7 +732,7 @@
     // 일정 (정기 + 한 번) — 시간이 있는 것만 그리드에 표시 (종일은 상단 스트립)
     (state.events||[]).filter(ev=>!ev.allDay&&eventOccursOn(ev,planDate)).forEach(ev=>{
       const top=minToTop(ev.start), height=Math.max(SNAP_MIN, ev.duration)*PX_PER_MIN-2;
-      const tag=ev.freq==='once'?'':'🔁 ';
+      const tag=ev.freq==='once'?'':cic('repeat')+' ';
       const card=el(`<div class="event-card" style="top:${top}px;height:${height}px;border-left-color:${ev.color||'#0d9488'}">
         <div class="bc-main"><span class="time">${tag}${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}</span><span class="bc-title">${esc(ev.title)}</span></div>
       </div>`);
@@ -828,7 +829,7 @@
     content.innerHTML='';
     const s=state.settings;
     const active=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'));
-    const opts=active.map(t=>`<option value="${t.id}" ${t.id===pomo.taskId?'selected':''}>${esc(t.title)} ${sessionsForTask(t.id)?'🍅×'+sessionsForTask(t.id):''}</option>`).join('');
+    const opts=active.map(t=>`<option value="${t.id}" ${t.id===pomo.taskId?'selected':''}>${esc(t.title)}${sessionsForTask(t.id)?' · '+sessionsForTask(t.id)+'회':''}</option>`).join('');
     const totalToday=todaySessions().length;
     const focusMin=todaySessions().reduce((a,b)=>a+(b.duration||0),0);
     const wrap=el(`<div class="pomo ${pomo.running?'pomo-running':''}">
@@ -853,7 +854,7 @@
         <button class="btn" id="pomoSkip">건너뛰기</button>
       </div>
       <div class="pomo-task">
-        <div style="font-size:13px;color:var(--muted);font-weight:600">🎯 집중할 할 일</div>
+        <div style="font-size:13px;color:var(--muted);font-weight:600">${svgIco('target')} 집중할 할 일</div>
         <select id="pomoTask"><option value="">— 선택 안 함 —</option>${opts}</select>
       </div>
       <div class="pomo-stats">
@@ -917,7 +918,7 @@
     pomo.remaining=pomoLen(pomo.mode);
     pomo.running=false;
     if(currentView==='pomodoro') renderPomodoro(); else paintPomo();
-    if(natural && pomo.mode!=='focus') toast('집중 완료! 🍅 잠시 휴식하세요.');
+    if(natural && pomo.mode!=='focus') toast('집중 완료! 잠시 휴식하세요.');
     if(natural && notifyEnabled()){
       if(pomo.mode!=='focus') showNotify('🍅 집중 완료','잠시 휴식하세요.','teum-pomo');
       else showNotify('☕ 휴식 끝','다시 집중해볼까요?','teum-pomo');
@@ -935,7 +936,7 @@
     tEl.textContent=fmtClock(pomo.remaining);
     const st=$('#pomoState');
     const taskName = pomo.taskId ? (state.tasks.find(t=>t.id===pomo.taskId)||{}).title : '';
-    st.textContent = pomo.mode==='focus' ? (taskName?('🎯 '+taskName):'집중 시간') : (pomo.mode==='short'?'짧은 휴식':'긴 휴식');
+    st.textContent = pomo.mode==='focus' ? (taskName||'집중 시간') : (pomo.mode==='short'?'짧은 휴식':'긴 휴식');
     const arc=$('#pomoArc'); if(arc){ const total=pomoLen(pomo.mode); const frac=pomo.remaining/total; arc.style.strokeDashoffset=String(339.3*(1-frac)); }
     const tog=$('#pomoToggle'); if(tog){ tog.textContent=pomo.running?'일시정지':'시작'; }
     document.querySelector('.pomo')?.classList.toggle('pomo-running',pomo.running);
@@ -1041,7 +1042,7 @@
     const ev=editingEventId?(state.events||[]).find(x=>x.id===editingEventId):null;
     const freq=ev?(ev.freq||'weekly'):(presetFreq||'weekly');
     const once=freq==='once';
-    $('#eventModalTitle').textContent=(ev?'편집 — ':'추가 — ')+(once?'📅 일반 일정':'🔁 정기 일정');
+    $('#eventModalTitle').textContent=(ev?'편집 — ':'추가 — ')+(once?'일반 일정':'정기 일정');
     $('#evDeleteBtn').style.display=ev?'':'none';
     $('#ev-title').value=ev?ev.title:'';
     $('#ev-allday').checked=ev?!!ev.allDay:false;
@@ -1307,7 +1308,7 @@
     content.innerHTML='';
     const wrap=el(`<div class="suggest">
       <div class="gap-pick">
-        <div class="q">⏳ 지금 몇 분의 틈이 있나요?</div>
+        <div class="q">${svgIco('clock')} 지금 몇 분의 틈이 있나요?</div>
         <div class="gap-chips" id="gapChips"></div>
       </div>
       <div class="suggest-lead">가용 시간·우선순위·소요·마감을 고려한 추천입니다. 결정은 직접 하세요.</div>
@@ -1326,7 +1327,7 @@
       .slice(0,6);
     const list=wrap.querySelector('#sgList');
     if(!cands.length){
-      list.appendChild(el(`<div class="empty"><div class="big">🍃</div>이 틈에 딱 맞는 일이 없어요.<br>큰 일을 더 잘게 나누거나, 소요 시간을 입력해 보세요.</div>`));
+      list.appendChild(el(`<div class="empty"><div class="big"><svg><use href="#i-suggest"/></svg></div>이 틈에 딱 맞는 일이 없어요.<br>큰 일을 더 잘게 나누거나, 소요 시간을 입력해 보세요.</div>`));
       return;
     }
     cands.forEach(({t,reason},i)=>{
@@ -1334,17 +1335,17 @@
         <span class="sg-rank">${i===0?'★':i+1}</span>
         <div class="sg-body"><div class="sg-title">${esc(t.title)}</div><div class="sg-meta"></div></div>
         <div class="sg-actions">
-          <button class="btn sm primary" data-a="focus">🍅 집중</button>
+          <button class="btn sm primary" data-a="focus">${svgIco('pomo')} 집중</button>
           <button class="btn sm" data-a="today">오늘</button>
           <button class="btn sm" data-a="done">✓</button>
         </div>
       </div>`);
       const meta=card.querySelector('.sg-meta');
-      meta.appendChild(el(`<span class="chip why">💡 ${reason}</span>`));
-      if(t.estimate) meta.appendChild(el(`<span class="chip">⏱ ${t.estimate}분</span>`));
-      else meta.appendChild(el(`<span class="chip" style="color:var(--muted)">⏱ 소요 미정</span>`));
+      meta.appendChild(el(`<span class="chip why">${cic('suggest')} ${reason}</span>`));
+      if(t.estimate) meta.appendChild(el(`<span class="chip">${cic('clock')} ${t.estimate}분</span>`));
+      else meta.appendChild(el(`<span class="chip" style="color:var(--muted)">${cic('clock')} 소요 미정</span>`));
       if(t.priority<=3) meta.appendChild(el(`<span class="chip" style="color:var(--p${t.priority})">P${t.priority}</span>`));
-      if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">📅 ${fmtDue(t.due)}</span>`)); }
+      if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">${cic('cal')} ${fmtDue(t.due)}</span>`)); }
       if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip">${esc(p.name)}</span>`)); }
       card.querySelector('[data-a="focus"]').onclick=()=>startPomoForTask(t.id);
       card.querySelector('[data-a="today"]').onclick=()=>{ t.due=todayStr(); if(t.status==='inbox'||t.status==='waiting')t.status='next'; t.updatedAt=Date.now(); save(); renderSuggest(); };
@@ -1368,7 +1369,7 @@
     const focusMin=daySessions.reduce((a,b)=>a+(b.duration||0),0);
     const leftover=sortTasks(state.tasks.filter(t=>!isDone(t)&&t.due&&t.due<=reviewDate));
     const headline = completed.length
-      ? `오늘 ${completed.length}개를 해냈어요 👏`
+      ? `오늘 ${completed.length}개를 해냈어요`
       : '아직 완료한 일이 없어요. 작은 한 걸음부터.';
     const wrap=el(`<div class="review">
       <div class="rv-head">
@@ -1435,7 +1436,7 @@
     const projRows=Object.entries(byProj).sort((a,b)=>b[1]-a[1]);
     const sd=parseDS(ws), ed=parseDS(we);
     const rangeLabel=`${sd.getMonth()+1}.${sd.getDate()} – ${ed.getMonth()+1}.${ed.getDate()}`;
-    const headline=completed.length?`이번 주 ${completed.length}개를 해냈어요 👏`:'이번 주 기록이 아직 없어요. 작은 한 걸음부터.';
+    const headline=completed.length?`이번 주 ${completed.length}개를 해냈어요`:'이번 주 기록이 아직 없어요. 작은 한 걸음부터.';
     if(!state.weekNotes) state.weekNotes={};
     const note=state.weekNotes[ws]||'';
     const wrap=el(`<div class="review">
@@ -1509,7 +1510,7 @@
       {n:'2', t:'분류 (Clarify)', d:'Inbox를 다음 할일·대기 중·언젠가로 끌어 정리. 2분이면 되는 일은 바로 처리.', view:'gtdboard', btn:'GTD 보드 열기'},
       {n:'3', t:'소요시간 (Estimate)', d:'할 일에 예상 소요(분)를 적어요. 이게 추천·타임블록의 연료가 됩니다.', view:null},
       {n:'4', t:'배치 (Schedule)', d:'타임박스에서 할 일을 시간표로 드래그. 오늘의 TOP 3를 먼저 정하세요.', view:'plan', btn:'타임박스 열기'},
-      {n:'5', t:'집중 (Focus)', d:'빈 시간이 생기면 “지금 이 틈”에서 딱 맞는 일을 골라 🍅 집중.', view:'suggest', btn:'지금 이 틈 열기'},
+      {n:'5', t:'집중 (Focus)', d:'빈 시간이 생기면 “지금 이 틈”에서 딱 맞는 일을 골라 집중.', view:'suggest', btn:'지금 이 틈 열기'},
       {n:'6', t:'완료 (Complete)', d:'체크해서 진전을 확인. 큰 일은 체크리스트로 나눠 ☑ 진행을 봅니다.', view:null},
       {n:'7', t:'돌아보기 (Reflect)', d:'하루는 일일 리뷰로, 한 주는 주간 리뷰로 닫고 다음을 준비하세요.', view:'weekreview', btn:'주간 리뷰 열기'},
     ];
@@ -1521,7 +1522,7 @@
       </div>
       <div class="guide-steps"></div>
       <div class="guide-card">
-        <h3>⚡ 빠른 추가 문법</h3>
+        <h3>${svgIco('next')} 빠른 추가 문법</h3>
         <p class="note">입력창에서 한 줄로:</p>
         <table class="g-syntax">
           <tr><td><code>!1</code>~<code>!4</code></td><td>우선순위</td></tr>
@@ -1532,7 +1533,7 @@
         <p class="note">예) <code>학회 초록 작성 !2 @연구 #논문 투고 오늘</code></p>
       </div>
       <div class="guide-card">
-        <h3>🌱 잘 쓰는 5가지 습관</h3>
+        <h3>${svgIco('done')} 잘 쓰는 5가지 습관</h3>
         <ol class="g-habits">
           <li>아침 5분 — 오늘 TOP 3를 정하고 큰 일부터 타임블록 배치</li>
           <li>모든 일에 예상 소요시간 입력 (추천·계획의 연료)</li>
@@ -1559,22 +1560,22 @@
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='settings'));
     content.innerHTML='';
     const authBox = authUser
-      ? `<div class="row" style="align-items:center"><div class="note" style="flex:1">✅ Google 로그인됨: <b>${esc(authUser.email||'계정')}</b><br>이 계정으로 모든 기기가 자동 동기화됩니다.</div><button class="btn" id="cf-logout">로그아웃</button></div>`
-      : `<button class="btn primary" id="cf-google">🔑 Google 계정으로 로그인</button><div class="note">로그인하면 어느 기기에서든 같은 데이터가 자동으로 동기화됩니다.</div>`;
+      ? `<div class="row" style="align-items:center"><div class="note" style="flex:1">${svgIco('done')} Google 로그인됨: <b>${esc(authUser.email||'계정')}</b><br>이 계정으로 모든 기기가 자동 동기화됩니다.</div><button class="btn" id="cf-logout">로그아웃</button></div>`
+      : `<button class="btn primary" id="cf-google">Google 계정으로 로그인</button><div class="note">로그인하면 어느 기기에서든 같은 데이터가 자동으로 동기화됩니다.</div>`;
     const box=el(`<div style="max-width:640px;display:flex;flex-direction:column;gap:18px">
       <div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
-        <strong>👤 계정</strong>
+        <strong>${svgIco('user')} 계정</strong>
         ${authBox}
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
-        <strong>📲 앱으로 설치</strong>
+        <strong>${svgIco('download')} 앱으로 설치</strong>
         <div class="note">홈 화면·독에 설치하면 앱처럼 바로 열리고, 띄워두기 쉬워 알림을 놓치지 않습니다.</div>
         <div id="install-area"></div>
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
-        <strong>🔔 알림</strong>
+        <strong>${svgIco('bell')} 알림</strong>
         <div class="note">앱이 켜져 있을 때 타임블록 시작·마감 시간·일정 시작·뽀모도로 종료를 알려줍니다. (앱을 완전히 닫으면 동작하지 않습니다)</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nt-on" style="width:auto" ${state.settings.notify?'checked':''}> 알림 사용</label>
         <div class="row" style="align-items:flex-end">
@@ -1587,7 +1588,7 @@
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
-        <strong>📅 공휴일 / 휴무일</strong>
+        <strong>${svgIco('cal')} 공휴일 / 휴무일</strong>
         <div class="note">여기에 등록한 날짜는 '공휴일 제외'를 켠 정기 일정에서 자동으로 빠집니다.</div>
         <div class="row" style="align-items:flex-end">
           <div class="field"><label>날짜 추가</label><input id="hol-date" type="date"></div>
@@ -1598,7 +1599,7 @@
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
-        <strong>💾 데이터 백업 / 복원</strong>
+        <strong>${svgIco('save')} 데이터 백업 / 복원</strong>
         <div class="row">
           <button class="btn" id="exp">JSON 내보내기</button>
           <button class="btn" id="imp">JSON 가져오기</button>
@@ -1615,9 +1616,9 @@
     const installArea=box.querySelector('#install-area');
     const renderInstall=()=>{
       installArea.innerHTML='';
-      if(isStandalone()){ installArea.appendChild(el(`<div class="note">✅ 이미 앱으로 실행 중입니다.</div>`)); return; }
+      if(isStandalone()){ installArea.appendChild(el(`<div class="note">${svgIco('done')} 이미 앱으로 실행 중입니다.</div>`)); return; }
       if(deferredInstall){
-        const b=el(`<button class="btn primary">📲 앱 설치</button>`);
+        const b=el(`<button class="btn primary">${svgIco('download')} 앱 설치</button>`);
         b.onclick=async()=>{
           try{ deferredInstall.prompt(); const {outcome}=await deferredInstall.userChoice;
             if(outcome==='accepted'){ deferredInstall=null; toast('설치를 시작했습니다.'); } }
@@ -1640,11 +1641,11 @@
     // 알림 설정
     const ntStatus=box.querySelector('#nt-status');
     const refreshNtStatus=()=>{
-      if(!notifySupported()){ ntStatus.textContent='⚠️ 이 브라우저는 알림을 지원하지 않습니다.'; return; }
+      if(!notifySupported()){ ntStatus.textContent='이 브라우저는 알림을 지원하지 않습니다.'; return; }
       if(!state.settings.notify){ ntStatus.textContent='알림이 꺼져 있습니다.'; return; }
       ntStatus.innerHTML = Notification.permission==='granted'
         ? '상태: <b style="color:var(--green)">켜짐</b> · 앱이 켜져 있을 때만 동작합니다.'
-        : '⚠️ 브라우저 알림 권한이 필요합니다. 사이트 권한에서 허용해 주세요.';
+        : '브라우저 알림 권한이 필요합니다. 사이트 권한에서 허용해 주세요.';
     };
     box.querySelector('#nt-on').onchange=async e=>{
       if(e.target.checked){

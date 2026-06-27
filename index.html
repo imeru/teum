@@ -30,6 +30,18 @@
   <symbol id="i-tag" viewBox="0 0 24 24"><path d="M9.5 3.5L7.5 20.5M16.5 3.5L14.5 20.5M4.5 8.5h15M3.5 15.5h15"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l2 2.5h7.5A1.5 1.5 0 0 1 20 9v8.5A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/></symbol>
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M4.5 19.5l4-1L19 8a2 2 0 0 0-3-3L5.5 15.5z"/><path d="M14 7l3 3"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2.5l3 3-3 3"/><path d="M20 5.5H9a5 5 0 0 0-5 5"/><path d="M7 21.5l-3-3 3-3"/><path d="M4 18.5h11a5 5 0 0 0 5-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.3"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11M4.3 6.5h.01M4.3 12h.01M4.3 17.5h.01"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20.5h14"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4.5h11l3 3v12H5z"/><path d="M8 4.5v5h7M8 19.5v-6h8v6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l1 13.5a1 1 0 0 0 1 .9h7a1 1 0 0 0 1-.9l1-13.5M10 10.5v6M14 10.5v6"/></symbol>
 </defs></svg>
 <!-- 로그인 게이트 (로그인 전까지 앱 위를 덮음) -->
 <div id="authGate" class="auth-gate show checking">
@@ -85,14 +97,14 @@
   <!-- Main -->
   <main class="main">
     <div class="topbar">
-      <button class="btn ghost menu-btn" id="menuBtn">☰</button>
+      <button class="btn ghost menu-btn" id="menuBtn"><svg class="ico-sm"><use href="#i-menu"/></svg></button>
       <div>
         <h1 id="viewTitle">오늘</h1>
         <div class="sub" id="viewSub"></div>
       </div>
       <div class="spacer"></div>
-      <button class="btn" id="pomoMini" style="display:none">🍅 <span id="pomoMiniTime">25:00</span></button>
-      <button class="btn primary" id="newTaskBtn">＋ 새 할 일</button>
+      <button class="btn" id="pomoMini" style="display:none"><svg class="ico-sm"><use href="#i-pomo"/></svg> <span id="pomoMiniTime">25:00</span></button>
+      <button class="btn primary" id="newTaskBtn"><svg class="ico-sm"><use href="#i-plus"/></svg> 새 할 일</button>
     </div>
     <div class="content" id="content"></div>
   </main>
@@ -120,10 +132,10 @@
         <div class="field">
           <label>GTD 상태</label>
           <select id="f-status">
-            <option value="inbox">📥 Inbox</option>
-            <option value="next">⚡ 다음 할일</option>
-            <option value="waiting">⏳ 대기 중</option>
-            <option value="someday">💭 언젠가</option>
+            <option value="inbox">Inbox</option>
+            <option value="next">다음 할일</option>
+            <option value="waiting">대기 중</option>
+            <option value="someday">언젠가</option>
           </select>
         </div>
         <div class="field">
@@ -202,7 +214,7 @@
 <!-- Event modal -->
 <div class="overlay" id="eventOverlay">
   <div class="modal" style="width:min(460px,100%)">
-    <div class="modal-head" id="eventModalTitle">🔁 정기 일정 추가</div>
+    <div class="modal-head" id="eventModalTitle">정기 일정 추가</div>
     <div class="modal-body">
       <div class="field"><label>제목</label><input id="ev-title" placeholder="예: 휴가, 출장, 건축환경 강의" /></div>
       <div class="row">
