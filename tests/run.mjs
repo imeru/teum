@@ -156,12 +156,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       { id: 'over', title: '지난마감', status: 'next', priority: 4, estimate: 10, due: plusDays(-2), tags: [], createdAt: 5, updatedAt: 1 },
       { id: 'huge', title: '안맞는2시간', status: 'next', priority: 1, estimate: 120, due: todayDS, tags: [], createdAt: 6, updatedAt: 1 },
       { id: 'sd', title: '언젠가', status: 'someday', priority: 1, estimate: 5, tags: [], createdAt: 7, updatedAt: 1 },
+      { id: 'ib', title: '수집함추천', status: 'inbox', priority: 1, estimate: 5, due: plusDays(-1), tags: [], createdAt: 8, updatedAt: 1 },
     ]
   }));
   $('.nav[data-view="suggest"]').click();
   ck('런타임 에러 없음', !getErr());
   let titles = $$('.sg-title').map(x => x.textContent);
   ck('15분: 소요>틈/언젠가 제외', !titles.includes('큰일55분') && !titles.includes('안맞는2시간') && !titles.includes('언젠가'));
+  ck('15분: Inbox 제외(다음 할일만)', !titles.includes('수집함추천'));
   ck('15분: 지난마감 1위', $$('.sg-card')[0].textContent.includes('지난마감'));
   ck('추천 이유 칩 노출', $('.chip.why'));
   $$('#gapChips button').find(b => b.textContent === '60분').click();

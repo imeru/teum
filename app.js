@@ -1319,7 +1319,7 @@
     custom.onchange=()=>{ const v=+custom.value; if(v>0){ suggestMin=v; renderSuggest(); } };
     chips.appendChild(custom);
 
-    const cands=state.tasks.filter(t=>!isDone(t)&&t.status!=='someday'&&(!t.estimate||t.estimate<=suggestMin))
+    const cands=state.tasks.filter(t=>!isDone(t)&&t.status==='next'&&(!t.estimate||t.estimate<=suggestMin))
       .map(t=>({t,...suggestScore(t,suggestMin)}))
       .sort((a,b)=> b.score-a.score || (a.t.createdAt-b.t.createdAt))
       .slice(0,6);
