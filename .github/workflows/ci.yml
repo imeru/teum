@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps (jsdom)
+        run: npm install --no-audit --no-fund
+      - name: Syntax check
+        run: |
+          node --check app.js
+          node --check logic.js
+          node --check helpers.js
+          node --check constants.js
+          node --check service-worker.js
+      - name: Headless tests
+        run: npm test
