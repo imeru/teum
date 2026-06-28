@@ -111,6 +111,11 @@ function mergeStates(local, remote){
   (L.memos||[]).forEach(m=>{ mById[m.id]=m; });
   (R.memos||[]).forEach(m=>{ const e=mById[m.id]; if(!e||(m.updatedAt||0)>(e.updatedAt||0)) mById[m.id]=m; });
   const memos=Object.values(mById).filter(m=>alive(m.id,m.updatedAt));
+  // folders (memos와 동일 규칙)
+  const fById={};
+  (L.folders||[]).forEach(f=>{ fById[f.id]=f; });
+  (R.folders||[]).forEach(f=>{ const e=fById[f.id]; if(!e||(f.updatedAt||0)>(e.updatedAt||0)) fById[f.id]=f; });
+  const folders=Object.values(fById).filter(f=>alive(f.id,f.updatedAt));
   // sessions (합집합)
   const sById={}; (L.sessions||[]).forEach(s=>sById[s.id]=s); (R.sessions||[]).forEach(s=>sById[s.id]=s);
   const sessions=Object.values(sById).filter(s=> !tomb[s.id]);
@@ -120,7 +125,7 @@ function mergeStates(local, remote){
   // holidays는 합집합 — 기존엔 'newer 통째로'라 한쪽 변경이 유실되던 비대칭 버그 수정.
   const mergeMap=(key)=>Object.assign({}, older[key]||{}, newer[key]||{});
   return {
-    tasks, sessions, memos,
+    tasks, sessions, memos, folders,
     projects: union('projects'),
     events: union('events'),
     settings: mergeMap('settings'),

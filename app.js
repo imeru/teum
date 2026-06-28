@@ -20,6 +20,7 @@
   let currentFilter = null; // {type:'project'|'tag', value}
   let editingId = null;
   let editingMemoId = null; // 메모 편집 중인 id (없으면 목록 보기)
+  let memoFolderId = 'all'; // 메모 뷰에서 선택된 폴더: 'all' | 'trash' | folderId
   let selectedPrio = 4;
   let projColor = PROJECT_COLORS[0];
   let supa = null;          // supabase client
@@ -49,7 +50,8 @@
       top3: {},
       events: [],
       holidays: [],
-      memos: [],       // 참고용 메모 [{id,title,body,color,createdAt,updatedAt}] — 완료 개념 없음
+      memos: [],       // 참고용 메모 [{id,title,body,html,color,folderId,pinned,trashedAt,createdAt,updatedAt}]
+      folders: [],     // 메모 분류 폴더 [{id,name,createdAt,updatedAt}] — '전체'/'휴지통'은 가상
       weekNotes: {},
       deletions: {},   // {id: deletedAt} — 동기화 병합 시 삭제 보존(tombstone)
       updatedAt: Date.now()
@@ -79,6 +81,8 @@
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
     if(!s.weekNotes) s.weekNotes={};
     if(!Array.isArray(s.memos)) s.memos=[];
+    if(!Array.isArray(s.folders)) s.folders=[];
+    s.memos.forEach(m=>{ if(m.folderId===undefined||m.folderId===null) m.folderId=''; if(typeof m.pinned!=='boolean') m.pinned=false; if(typeof m.trashedAt!=='number') m.trashedAt=0; });
     if(!s.deletions||typeof s.deletions!=='object') s.deletions={};
     return s;
   }
@@ -224,6 +228,7 @@
     const first=(m.body||'').split('\n').map(s=>s.trim()).find(Boolean);
     return first || '제목 없음';
   }
+  function memoFolderName(fid){ const f=(state.folders||[]).find(x=>x.id===fid); return f?(f.name||'폴더'):''; }
   function renderMemo(){
     $('#viewTitle').textContent='메모';
     $('#viewSub').textContent='완료해도 사라지지 않는, 계속 참고할 정보';
@@ -232,12 +237,44 @@
     const editing=editingMemoId ? (state.memos||[]).find(m=>m.id===editingMemoId) : null;
     if(editingMemoId && !editing) editingMemoId=null;
     if(editing){ content.appendChild(memoEditor(editing)); return; }
-    const add=el(`<div style="margin-bottom:16px"><button class="btn primary" id="memoAdd">${cic('plus')} 새 메모</button></div>`);
-    add.querySelector('#memoAdd').onclick=addMemo;
-    content.appendChild(add);
-    const memos=(state.memos||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const folders=(state.folders||[]).slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+    if(memoFolderId!=='all'&&memoFolderId!=='trash'&&!folders.some(f=>f.id===memoFolderId)) memoFolderId='all';
+    const all=(state.memos||[]);
+    const trashCount=all.filter(m=>m.trashedAt).length;
+    const countFor=fid=> all.filter(m=>!m.trashedAt && (fid==='all'||m.folderId===fid)).length;
+    // 폴더 바
+    const bar=el('<div class="memo-folderbar"></div>');
+    const chip=(id,label,count,extra='')=>{
+      const b=el(`<button class="memo-folder ${memoFolderId===id?'sel':''} ${extra}" data-fid="${id}">${esc(label)}<span class="mf-count">${count||''}</span></button>`);
+      b.onclick=()=>{ memoFolderId=id; render(); };
+      return b;
+    };
+    bar.appendChild(chip('all','전체',countFor('all')));
+    folders.forEach(f=>bar.appendChild(chip(f.id, f.name||'폴더', countFor(f.id))));
+    const addF=el(`<button class="memo-folder add" id="memoAddFolder" title="폴더 추가">${cic('plus')} 폴더</button>`); addF.onclick=addFolder; bar.appendChild(addF);
+    bar.appendChild(chip('trash','휴지통',trashCount,'trash'));
+    content.appendChild(bar);
+    // 액션 줄
+    const actions=el('<div class="memo-actionsbar"></div>');
+    if(memoFolderId==='trash'){
+      const empty=el(`<button class="btn sm" id="memoEmptyTrash" style="color:var(--p1)">${svgIco('trash')} 휴지통 비우기</button>`);
+      empty.onclick=emptyTrash; actions.appendChild(empty);
+    } else {
+      const add=el(`<button class="btn primary" id="memoAdd">${cic('plus')} 새 메모</button>`);
+      add.onclick=addMemo; actions.appendChild(add);
+      if(memoFolderId!=='all'){
+        const ren=el(`<button class="btn sm" id="memoRenameFolder">이름 변경</button>`); ren.onclick=()=>renameFolder(memoFolderId); actions.appendChild(ren);
+        const del=el(`<button class="btn sm" id="memoDeleteFolder" style="color:var(--p1)">폴더 삭제</button>`); del.onclick=()=>deleteFolder(memoFolderId); actions.appendChild(del);
+      }
+    }
+    content.appendChild(actions);
+    // 목록 (휴지통: trashedAt 내림차순 / 그 외: 고정 우선 → 최근 편집순)
+    let memos=all.filter(m=> memoFolderId==='trash' ? m.trashedAt : (!m.trashedAt && (memoFolderId==='all'||m.folderId===memoFolderId)));
+    if(memoFolderId==='trash') memos.sort((a,b)=>(b.trashedAt||0)-(a.trashedAt||0));
+    else memos.sort((a,b)=> ((b.pinned?1:0)-(a.pinned?1:0)) || ((b.updatedAt||0)-(a.updatedAt||0)));
     if(!memos.length){
-      content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />아직 메모가 없습니다. 위에서 새 메모를 추가하세요.</div>`));
+      const msg = memoFolderId==='trash' ? '휴지통이 비어 있습니다.' : '아직 메모가 없습니다. 위에서 새 메모를 추가하세요.';
+      content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />${msg}</div>`));
       return;
     }
     const list=el('<div class="memo-list"></div>');
@@ -246,19 +283,77 @@
   }
   function memoCard(m){
     const body=(m.body||'').trim();
-    const card=el(`<div class="memo-card" data-id="${m.id}">
+    const inTrash=!!m.trashedAt;
+    const pinned=m.pinned&&!inTrash;
+    const card=el(`<div class="memo-card ${pinned?'pinned':''}" data-id="${m.id}">
       <div class="memo-card-body">
-        <div class="memo-title">${esc(memoDisplayTitle(m))}</div>
+        <div class="memo-title">${pinned?'<span class="mf-pin">고정</span>':''}${esc(memoDisplayTitle(m))}</div>
         ${body?`<div class="memo-preview">${esc(body)}</div>`:''}
       </div>
-      <div class="memo-actions">
-        <button class="iconbtn" data-act="del" title="삭제">${svgIco('trash')}</button>
-      </div>
+      <div class="memo-actions"></div>
     </div>`);
     if(m.color) card.style.borderLeft=`3px solid ${m.color}`;
     card.querySelector('.memo-card-body').onclick=()=>{ editingMemoId=m.id; render(); };
-    card.querySelector('[data-act="del"]').onclick=e=>{ e.stopPropagation(); delMemo(m.id); };
+    const acts=card.querySelector('.memo-actions');
+    if(inTrash){
+      const r=el(`<button class="iconbtn" data-act="restore" title="복원">복원</button>`);
+      r.onclick=e=>{ e.stopPropagation(); restoreMemo(m.id); };
+      const p=el(`<button class="iconbtn" data-act="purge" title="완전 삭제">${svgIco('trash')}</button>`);
+      p.onclick=e=>{ e.stopPropagation(); purgeMemo(m.id); };
+      acts.appendChild(r); acts.appendChild(p);
+    } else {
+      const pin=el(`<button class="iconbtn ${m.pinned?'on':''}" data-act="pin" title="${m.pinned?'고정 해제':'상단 고정'}">${m.pinned?'고정됨':'고정'}</button>`);
+      pin.onclick=e=>{ e.stopPropagation(); pinMemo(m.id); };
+      const sel=el(`<select class="memo-move" data-act="move" title="폴더 이동"></select>`);
+      sel.appendChild(el(`<option value="">폴더 없음</option>`));
+      (state.folders||[]).forEach(f=>{ const o=el(`<option value="${f.id}">${esc(f.name||'폴더')}</option>`); if(m.folderId===f.id) o.selected=true; sel.appendChild(o); });
+      sel.onclick=e=>e.stopPropagation();
+      sel.onchange=e=>{ e.stopPropagation(); moveMemo(m.id, sel.value); };
+      const del=el(`<button class="iconbtn" data-act="del" title="휴지통으로">${svgIco('trash')}</button>`);
+      del.onclick=e=>{ e.stopPropagation(); delMemo(m.id); };
+      acts.appendChild(pin); acts.appendChild(sel); acts.appendChild(del);
+    }
     return card;
+  }
+  // 폴더 CRUD / 메모 이동·고정 / 휴지통
+  function addFolder(){
+    if(!Array.isArray(state.folders)) state.folders=[];
+    const base='새 폴더'; let name=base, i=2;
+    while(state.folders.some(f=>f.name===name)) name=base+' '+(i++);
+    const f={id:uid(),name,createdAt:Date.now(),updatedAt:Date.now()};
+    state.folders.push(f); memoFolderId=f.id; save(); render();
+  }
+  function renameFolder(id){
+    const f=(state.folders||[]).find(x=>x.id===id); if(!f) return;
+    let name=f.name; try{ if(typeof prompt==='function'){ const r=prompt('폴더 이름', f.name); if(r===null) return; name=r; } }catch(e){}
+    f.name=(name||'').trim()||f.name; f.updatedAt=Date.now(); save(); render();
+  }
+  function deleteFolder(id){
+    const f=(state.folders||[]).find(x=>x.id===id); if(!f) return;
+    let ok=true; try{ if(typeof confirm==='function') ok=confirm(`'${f.name}' 폴더를 삭제할까요? 안의 메모는 '전체'로 이동합니다.`); }catch(e){}
+    if(!ok) return;
+    (state.memos||[]).forEach(m=>{ if(m.folderId===id){ m.folderId=''; m.updatedAt=Date.now(); } });
+    state.folders=(state.folders||[]).filter(x=>x.id!==id);
+    if(!state.deletions)state.deletions={}; state.deletions[id]=Date.now();
+    if(memoFolderId===id) memoFolderId='all';
+    save(); render();
+  }
+  function moveMemo(id,fid){ const m=(state.memos||[]).find(x=>x.id===id); if(!m) return; m.folderId=fid||''; m.updatedAt=Date.now(); save(); render(); }
+  function pinMemo(id){ const m=(state.memos||[]).find(x=>x.id===id); if(!m) return; m.pinned=!m.pinned; m.updatedAt=Date.now(); save(); render(); }
+  function restoreMemo(id){ const m=(state.memos||[]).find(x=>x.id===id); if(!m) return; m.trashedAt=0; m.updatedAt=Date.now(); save(); render(); }
+  function purgeMemo(id){
+    state.memos=(state.memos||[]).filter(x=>x.id!==id);
+    if(!state.deletions)state.deletions={}; state.deletions[id]=Date.now();
+    if(editingMemoId===id) editingMemoId=null; save(); render();
+  }
+  function emptyTrash(){
+    const trashed=(state.memos||[]).filter(m=>m.trashedAt); if(!trashed.length) return;
+    let ok=true; try{ if(typeof confirm==='function') ok=confirm(`휴지통의 메모 ${trashed.length}개를 완전히 삭제할까요?`); }catch(e){}
+    if(!ok) return;
+    if(!state.deletions)state.deletions={};
+    trashed.forEach(m=>{ state.deletions[m.id]=Date.now(); });
+    state.memos=(state.memos||[]).filter(m=>!m.trashedAt);
+    save(); render();
   }
   // 본문 리치 텍스트(HTML) ↔ 평문(body) 변환 — 미리보기/제목/검색은 평문 사용
   function memoHtmlToText(html){
@@ -386,28 +481,13 @@
       </div>
       <input class="memo-edit-title" id="memoTitle" placeholder="제목 (생략하면 본문 첫 줄)" />
       <div class="memo-colors" id="memoColors"></div>
-      <div class="memo-toolbar" id="memoToolbar">
-        <select class="memo-tool-sel" id="memoFont" title="글꼴"></select>
-        <select class="memo-tool-sel" id="memoSize" title="글자 크기"></select>
-        <span class="memo-tool-sep"></span>
-        <button type="button" class="memo-tool" data-cmd="bold" title="볼드체" style="font-weight:800">B</button>
-        <button type="button" class="memo-tool" data-cmd="italic" title="기울임" style="font-style:italic;font-family:serif">I</button>
-        <button type="button" class="memo-tool" data-cmd="bullet" title="블릿포인트">• 목록</button>
-        <button type="button" class="memo-tool" data-cmd="check" title="체크박스">☑ 체크</button>
-        <span class="memo-tool-sep"></span>
-        <button type="button" class="memo-tool" data-cmd="image" title="그림 넣기 (클립보드 붙여넣기도 가능)">그림</button>
-      </div>
-      <div class="memo-edit-body" id="memoBody" contenteditable="true" spellcheck="false" data-ph="계속 참고할 내용을 입력하세요 — 클립보드 이미지도 붙여넣을 수 있어요"></div>
+      <div id="memoBodyHost"></div>
       <div class="memo-dates" id="memoDates">
         <label class="memo-date"><span>생성일시</span><input type="datetime-local" id="memoCreated" /></label>
         <label class="memo-date"><span>최근 편집일시</span><input type="datetime-local" id="memoUpdated" /></label>
       </div>
-      <input type="file" id="memoImgFile" accept="image/*" style="display:none" />
     </div>`);
     const ti=wrap.querySelector('#memoTitle'); ti.value=m.title||'';
-    const bo=wrap.querySelector('#memoBody');
-    bo.innerHTML = (m.html!=null ? m.html : memoTextToHtml(m.body));
-    memoMigrateChecks(bo); memoNormalize(bo);
     const cIn=wrap.querySelector('#memoCreated'), uIn=wrap.querySelector('#memoUpdated');
     const savedEl=wrap.querySelector('#memoSaved');
     let savedTimer=null;
@@ -415,9 +495,49 @@
     function markSaved(){ savedEl.className='memo-saved saving'; savedEl.textContent='저장 중…'; clearTimeout(savedTimer); savedTimer=setTimeout(showSaved,500); }
     showSaved(); // 에디터 진입 시점엔 이미 저장된 상태
     const refreshDates=()=>{ if(document.activeElement!==uIn) uIn.value=memoDTInput(m.updatedAt); if(document.activeElement!==cIn) cIn.value=memoDTInput(m.createdAt); };
-    const syncBody=()=>{ m.html=bo.innerHTML; m.body=memoHtmlToText(bo.innerHTML); m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
     const touch=()=>{ m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
     ti.addEventListener('input',()=>{ m.title=ti.value; touch(); });
+    // 색상
+    const cp=wrap.querySelector('#memoColors');
+    MEMO_COLORS.forEach(c=>{
+      const b=el(`<button type="button" class="memo-color ${c?'':'none'} ${m.color===c?'sel':''}" title="${c?'색상':'색 없음'}"></button>`);
+      if(c) b.style.background=c;
+      b.onclick=()=>{ m.color=c; m.updatedAt=Date.now(); save(); render(); };
+      cp.appendChild(b);
+    });
+    // 본문 에디터: Quill 있으면 Quill, 없으면 기본(contenteditable) 폴백
+    const host=wrap.querySelector('#memoBodyHost');
+    if(window.Quill){ try{ mountQuillEditor(host, m, {markSaved, refreshDates}); }catch(e){ host.innerHTML=''; mountBasicEditor(host, m, {markSaved, refreshDates}); } }
+    else mountBasicEditor(host, m, {markSaved, refreshDates});
+    // 날짜/시간 (생성·최근 편집, 직접 수정 가능)
+    cIn.value=memoDTInput(m.createdAt); uIn.value=memoDTInput(m.updatedAt);
+    cIn.addEventListener('change',()=>{ const t=new Date(cIn.value).getTime(); if(!isNaN(t)){ m.createdAt=t; save(); markSaved(); } });
+    uIn.addEventListener('change',()=>{ const t=new Date(uIn.value).getTime(); if(!isNaN(t)){ m.updatedAt=t; save(); markSaved(); } });
+    wrap.querySelector('#memoBack').onclick=()=>{ editingMemoId=null; render(); };
+    wrap.querySelector('#memoDel').onclick=()=>{ delMemo(m.id); };
+    return wrap;
+  }
+  // 기본 에디터(폴백): Quill 미로드 환경(테스트 등)에서 contenteditable + execCommand
+  function mountBasicEditor(host, m, ctx){
+    const {markSaved, refreshDates}=ctx;
+    host.appendChild(el(`<div class="memo-toolbar" id="memoToolbar">
+      <select class="memo-tool-sel" id="memoFont" title="글꼴"></select>
+      <select class="memo-tool-sel" id="memoSize" title="글자 크기"></select>
+      <span class="memo-tool-sep"></span>
+      <button type="button" class="memo-tool" data-cmd="bold" title="볼드체" style="font-weight:800">B</button>
+      <button type="button" class="memo-tool" data-cmd="italic" title="기울임" style="font-style:italic;font-family:serif">I</button>
+      <button type="button" class="memo-tool" data-cmd="bullet" title="블릿포인트">• 목록</button>
+      <button type="button" class="memo-tool" data-cmd="check" title="체크박스">☑ 체크</button>
+      <span class="memo-tool-sep"></span>
+      <button type="button" class="memo-tool" data-cmd="image" title="그림 넣기 (클립보드 붙여넣기도 가능)">그림</button>
+    </div>`));
+    const bo=el(`<div class="memo-edit-body" id="memoBody" contenteditable="true" spellcheck="false" data-ph="계속 참고할 내용을 입력하세요 — 클립보드 이미지도 붙여넣을 수 있어요"></div>`);
+    host.appendChild(bo);
+    const fileInput=el(`<input type="file" id="memoImgFile" accept="image/*" style="display:none" />`);
+    host.appendChild(fileInput);
+    bo.innerHTML = (m.html!=null ? m.html : memoTextToHtml(m.body));
+    memoMigrateChecks(bo); memoNormalize(bo);
+    const syncBody=()=>{ m.html=bo.innerHTML; m.body=memoHtmlToText(bo.innerHTML); m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
     bo.addEventListener('input', syncBody);
     // 체크박스: 박스(.memo-chk-box)만 클릭 토글 → 텍스트 편집 보존
     bo.addEventListener('click', e=>{
@@ -425,7 +545,6 @@
       e.preventDefault(); const line=box.closest('.memo-chk'); if(!line) return;
       const on=line.classList.toggle('checked'); box.setAttribute('aria-checked', on?'true':'false'); syncBody();
     });
-    // 체크 줄에서 Enter: 빈 줄이면 체크 해제(일반 줄), 아니면 다음 체크 줄 생성
     bo.addEventListener('keydown', e=>{
       if(e.key!=='Enter'||e.shiftKey||e.isComposing) return;
       const s=document.getSelection(); if(!s.rangeCount) return;
@@ -448,25 +567,15 @@
       const items=(e.clipboardData&&e.clipboardData.items)||[];
       for(const it of items){ if(it.type&&it.type.indexOf('image/')===0){ const f=it.getAsFile&&it.getAsFile(); if(f){ e.preventDefault(); memoInsertImage(bo,f,syncBody); return; } } }
     });
-    // 색상
-    const cp=wrap.querySelector('#memoColors');
-    MEMO_COLORS.forEach(c=>{
-      const b=el(`<button type="button" class="memo-color ${c?'':'none'} ${m.color===c?'sel':''}" title="${c?'색상':'색 없음'}"></button>`);
-      if(c) b.style.background=c;
-      b.onclick=()=>{ m.color=c; m.updatedAt=Date.now(); save(); render(); };
-      cp.appendChild(b);
-    });
-    // 글꼴·크기 셀렉트 (선택 유지 위해 mousedown 시 포커스 보존)
     const keepFocus=elm=>elm.addEventListener('mousedown',ev=>{ if(elm.tagName!=='SELECT') ev.preventDefault(); });
-    const fontSel=wrap.querySelector('#memoFont');
+    const fontSel=host.querySelector('#memoFont');
     MEMO_FONTS.forEach((f,i)=>fontSel.appendChild(el(`<option value="${i}">${f.label}</option>`)));
     fontSel.addEventListener('change',()=>{ bo.focus(); const f=MEMO_FONTS[+fontSel.value]; if(f) memoExec('fontName', f.css||'inherit'); syncBody(); fontSel.selectedIndex=0; });
-    const sizeSel=wrap.querySelector('#memoSize');
+    const sizeSel=host.querySelector('#memoSize');
     sizeSel.appendChild(el(`<option value="">크기</option>`));
     MEMO_SIZES.forEach(s=>sizeSel.appendChild(el(`<option value="${s.v}">${s.label}</option>`)));
     sizeSel.addEventListener('change',()=>{ bo.focus(); if(sizeSel.value) memoExec('fontSize', sizeSel.value); syncBody(); sizeSel.selectedIndex=0; });
-    // 서식 버튼
-    wrap.querySelectorAll('.memo-tool[data-cmd]').forEach(btn=>{
+    host.querySelectorAll('.memo-tool[data-cmd]').forEach(btn=>{
       keepFocus(btn);
       btn.addEventListener('click',()=>{
         const cmd=btn.dataset.cmd; bo.focus();
@@ -474,29 +583,80 @@
         else if(cmd==='italic') memoExec('italic');
         else if(cmd==='bullet') memoExec('insertUnorderedList');
         else if(cmd==='check'){ memoToggleCheck(bo); }
-        else if(cmd==='image'){ wrap.querySelector('#memoImgFile').click(); return; }
+        else if(cmd==='image'){ fileInput.click(); return; }
         syncBody();
       });
     });
-    wrap.querySelector('#memoImgFile').addEventListener('change',e=>{ const f=e.target.files&&e.target.files[0]; if(f){ bo.focus(); memoInsertImage(bo,f,syncBody); } e.target.value=''; });
-    // 날짜/시간 (생성·최근 편집, 직접 수정 가능)
-    cIn.value=memoDTInput(m.createdAt); uIn.value=memoDTInput(m.updatedAt);
-    cIn.addEventListener('change',()=>{ const t=new Date(cIn.value).getTime(); if(!isNaN(t)){ m.createdAt=t; save(); markSaved(); } });
-    uIn.addEventListener('change',()=>{ const t=new Date(uIn.value).getTime(); if(!isNaN(t)){ m.updatedAt=t; save(); markSaved(); } });
-    wrap.querySelector('#memoBack').onclick=()=>{ editingMemoId=null; render(); };
-    wrap.querySelector('#memoDel').onclick=()=>{ delMemo(m.id); };
-    return wrap;
+    fileInput.addEventListener('change',e=>{ const f=e.target.files&&e.target.files[0]; if(f){ bo.focus(); memoInsertImage(bo,f,syncBody); } e.target.value=''; });
+  }
+  // 기존 저장 HTML(커스텀 체크박스/옛 label) → Quill 체크리스트(li[data-list])로 변환
+  function memoToQuillHtml(html){
+    const d=document.createElement('div'); d.innerHTML=html||'';
+    d.querySelectorAll('label.memo-chk').forEach(lab=>{
+      const inp=lab.querySelector('input[type="checkbox"]'); const checked=!!(inp&&(inp.checked||inp.hasAttribute('checked')));
+      const div=document.createElement('div'); div.className='memo-chk'+(checked?' checked':'');
+      const t=document.createElement('span'); t.className='memo-chk-t'; Array.from(lab.childNodes).forEach(n=>{ if(n!==inp) t.appendChild(n); });
+      div.appendChild(t); lab.replaceWith(div);
+    });
+    d.querySelectorAll('.memo-chk').forEach(line=>{
+      const checked=line.classList.contains('checked');
+      const t=line.querySelector('.memo-chk-t');
+      const li=document.createElement('li'); li.setAttribute('data-list', checked?'checked':'unchecked');
+      if(t){ while(t.firstChild) li.appendChild(t.firstChild); }
+      else { Array.from(line.childNodes).forEach(n=>{ if(n.classList&&n.classList.contains('memo-chk-box')) return; li.appendChild(n); }); }
+      const ul=document.createElement('ul'); ul.appendChild(li); line.replaceWith(ul);
+    });
+    return d.innerHTML;
+  }
+  function quillInsertImage(q, file){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const src=reader.result, img=new Image();
+      const place=url=>{ const range=q.getSelection(true); const idx=range?range.index:q.getLength(); q.insertEmbed(idx,'image',url,'user'); q.setSelection(idx+1,0,'silent'); };
+      img.onload=()=>{ let url=src; const MAX=1280; if(img.width>MAX||img.height>MAX){ const sc=Math.min(MAX/img.width,MAX/img.height); const cw=Math.round(img.width*sc),ch=Math.round(img.height*sc); const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch; try{ cv.getContext('2d').drawImage(img,0,0,cw,ch); url=cv.toDataURL('image/jpeg',0.85);}catch(e){url=src;} } place(url); };
+      img.onerror=()=>place(src); img.src=src;
+    };
+    reader.readAsDataURL(file);
+  }
+  // Quill 에디터 마운트
+  function mountQuillEditor(host, m, ctx){
+    const {markSaved, refreshDates}=ctx;
+    const tb=el('<div class="memo-quill-toolbar"></div>');
+    tb.innerHTML='<span class="ql-formats"><select class="ql-font"></select><select class="ql-size"></select></span>'+
+      '<span class="ql-formats"><button class="ql-bold"></button><button class="ql-italic"></button><button class="ql-underline"></button><button class="ql-strike"></button></span>'+
+      '<span class="ql-formats"><button class="ql-list" value="bullet"></button><button class="ql-list" value="check"></button></span>'+
+      '<span class="ql-formats"><button class="ql-image"></button></span>';
+    const container=el('<div class="memo-quill"></div>');
+    host.appendChild(tb); host.appendChild(container);
+    const q=new Quill(container, { theme:'snow', placeholder:'계속 참고할 내용을 입력하세요 — 클립보드 이미지도 붙여넣을 수 있어요', modules:{ toolbar: tb } });
+    const html = (m.html!=null && m.html!=='') ? memoToQuillHtml(m.html) : memoTextToHtml(m.body);
+    q.clipboard.dangerouslyPasteHTML(html||'<p><br></p>');
+    // 이미지: 툴바 버튼 + 클립보드 붙여넣기 모두 다운스케일 후 삽입
+    const tbMod=q.getModule('toolbar');
+    if(tbMod) tbMod.addHandler('image', ()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) quillInsertImage(q,f); }; inp.click(); });
+    q.root.addEventListener('paste', e=>{
+      const items=(e.clipboardData&&e.clipboardData.items)||[];
+      for(const it of items){ if(it.type&&it.type.indexOf('image/')===0){ const f=it.getAsFile&&it.getAsFile(); if(f){ e.preventDefault(); e.stopPropagation(); quillInsertImage(q,f); return; } } }
+    }, true);
+    // 초기 로드 후에 변경 추적(로드만으로 updatedAt 안 바뀌게)
+    q.on('text-change', ()=>{
+      m.html = (q.getSemanticHTML?q.getSemanticHTML():q.root.innerHTML);
+      m.body = (q.getText()||'').replace(/\n+$/,'').trim();
+      m.updatedAt=Date.now(); save(); refreshDates(); markSaved();
+    });
   }
   function addMemo(){
-    const m={id:uid(),title:'',body:'',html:'',color:'',createdAt:Date.now(),updatedAt:Date.now()};
+    const fid=(memoFolderId!=='all'&&memoFolderId!=='trash')?memoFolderId:'';
+    const m={id:uid(),title:'',body:'',html:'',color:'',folderId:fid,pinned:false,trashedAt:0,createdAt:Date.now(),updatedAt:Date.now()};
     if(!Array.isArray(state.memos)) state.memos=[];
     state.memos.push(m);
     editingMemoId=m.id;
     save(); render();
   }
+  // 삭제 = 휴지통으로 이동(보관). 완전 삭제는 purgeMemo/emptyTrash에서 tombstone 처리.
   function delMemo(id){
-    state.memos=(state.memos||[]).filter(x=>x.id!==id);
-    if(!state.deletions)state.deletions={}; state.deletions[id]=Date.now(); // tombstone(동기화 병합용)
+    const m=(state.memos||[]).find(x=>x.id===id); if(!m) return;
+    m.trashedAt=Date.now(); m.updatedAt=Date.now();
     if(editingMemoId===id) editingMemoId=null;
     save(); render();
   }

@@ -627,13 +627,56 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   $$('.memo-card .memo-card-body').find(e => e.textContent.includes('참고자료')).click();
   ck('카드 클릭 → 편집 열림', $('#memoTitle').value === '참고자료');
   $('#memoBack').click();
-  // 삭제 (m1) → 카드 수 감소 + tombstone
+  // 삭제 = 휴지통 이동(보관)
   const before = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.length;
   $$('.memo-card').find(c => c.textContent.includes('참고자료')).querySelector('[data-act="del"]').click();
-  const after = JSON.parse(localStorage.getItem('flowdo.state.v1'));
-  ck('삭제 → 메모 수 감소', after.memos.length === before - 1);
-  ck('삭제 → tombstone 기록', !!(after.deletions && after.deletions['m1']));
-  ck('삭제 → 해당 메모 제거', !after.memos.some(m => m.id === 'm1'));
+  let st1 = JSON.parse(localStorage.getItem('flowdo.state.v1'));
+  ck('삭제 → 메모 보존(휴지통 이동)', st1.memos.length === before);
+  ck('삭제 → trashedAt 기록', st1.memos.find(m => m.id === 'm1').trashedAt > 0);
+  ck('삭제 → 목록에서 숨김', !$$('.memo-card .memo-title').some(e => e.textContent.includes('참고자료')));
+  // 휴지통 뷰 + 복원
+  $('.memo-folder.trash').click();
+  ck('휴지통 뷰', $('.memo-folder.trash').classList.contains('sel') && $$('.memo-card').length === 1);
+  $$('.memo-card')[0].querySelector('[data-act="restore"]').click();
+  ck('복원 → trashedAt 해제', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === 'm1').trashedAt === 0);
+  // 다시 삭제 → 완전 삭제(purge)
+  $('.memo-folder[data-fid="all"]').click();
+  $$('.memo-card').find(c => c.textContent.includes('참고자료')).querySelector('[data-act="del"]').click();
+  $('.memo-folder.trash').click();
+  window.confirm = () => true;
+  $$('.memo-card')[0].querySelector('[data-act="purge"]').click();
+  let st2 = JSON.parse(localStorage.getItem('flowdo.state.v1'));
+  ck('완전 삭제 → 메모 제거', !st2.memos.some(m => m.id === 'm1'));
+  ck('완전 삭제 → tombstone 기록', !!(st2.deletions && st2.deletions['m1']));
+  // 폴더 생성 / 자동 선택
+  $('.memo-folder[data-fid="all"]').click();
+  $('#memoAddFolder').click();
+  let st3 = JSON.parse(localStorage.getItem('flowdo.state.v1'));
+  ck('폴더 추가', st3.folders.length === 1);
+  const fid = st3.folders[0].id;
+  ck('새 폴더 자동 선택', !!$(`.memo-folder[data-fid="${fid}"]`) && $(`.memo-folder[data-fid="${fid}"]`).classList.contains('sel'));
+  // 폴더에서 새 메모 추가 → 해당 폴더 소속
+  $('#memoAdd').click(); $('#memoBack').click();
+  ck('폴더에서 추가한 메모는 폴더 소속', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.some(m => m.folderId === fid));
+  ck('폴더 뷰에 1개', $$('.memo-card').length === 1);
+  // 전체에서 메모를 폴더로 이동
+  $('.memo-folder[data-fid="all"]').click();
+  const mv = $$('.memo-card .memo-move').find(s => s.closest('.memo-card').dataset.id);
+  const mvId = mv.closest('.memo-card').dataset.id;
+  mv.value = fid; mv.dispatchEvent(new window.Event('change'));
+  ck('폴더 이동 반영', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === mvId).folderId === fid);
+  // 고정 토글 + 상단 정렬
+  $('.memo-folder[data-fid="all"]').click();
+  const pc = $$('.memo-card')[0]; const pid = pc.dataset.id;
+  pc.querySelector('[data-act="pin"]').click();
+  ck('고정 → pinned=true', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === pid).pinned === true);
+  ck('고정 메모 최상단', $$('.memo-card')[0].dataset.id === pid);
+  // 폴더 삭제 → 메모는 전체로 이동
+  $(`.memo-folder[data-fid="${fid}"]`).click();
+  $('#memoDeleteFolder').click();
+  let st5 = JSON.parse(localStorage.getItem('flowdo.state.v1'));
+  ck('폴더 삭제', st5.folders.length === 0);
+  ck('폴더 삭제 → 메모 folderId 비움', st5.memos.filter(m => m.folderId === fid).length === 0);
   // mergeStates: memos 병합 (tasks와 동일 규칙)
   const M = window.mergeStates;
   let mg = M({ memos: [{ id: 'ML', title: '로컬메모', updatedAt: 5 }], updatedAt: 10 },
@@ -648,6 +691,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   mg = M({ memos: [], deletions: { MD: 100 }, updatedAt: 100 },
          { memos: [{ id: 'MD', title: '삭제후편집', updatedAt: 150 }], updatedAt: 200 });
   ck('merge memos: 삭제보다 최신 편집은 부활', mg.memos.some(x => x.id === 'MD'));
+  // mergeStates: folders 병합 (memos와 동일 규칙)
+  mg = M({ folders: [{ id: 'FL', name: '로컬폴더', updatedAt: 5 }], updatedAt: 10 },
+         { folders: [{ id: 'FR', name: '원격폴더', updatedAt: 5 }], updatedAt: 20 });
+  ck('merge folders: 양쪽 보존', mg.folders.some(x => x.id === 'FL') && mg.folders.some(x => x.id === 'FR'));
+  mg = M({ folders: [], deletions: { FD: 100 }, updatedAt: 100 },
+         { folders: [{ id: 'FD', name: '삭제폴더', updatedAt: 50 }], updatedAt: 200 });
+  ck('merge folders: tombstone 삭제 보존', !mg.folders.some(x => x.id === 'FD'));
 }
 
 // ───────────────────────── 결과 ─────────────────────────

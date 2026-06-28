@@ -120,6 +120,35 @@ input,textarea,select{font-family:inherit}
 .memo-chk.checked .memo-chk-t *{text-decoration:inherit}
 /* 옛 구조(label>input) 잔존분 호환 */
 .memo-chk input[type="checkbox"]{margin-top:4px;flex:0 0 auto;width:16px;height:16px;accent-color:var(--green);cursor:pointer}
+/* 폴더 바 / 액션 줄 */
+.memo-folderbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.memo-folder{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:20px;padding:5px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.memo-folder:hover{background:var(--panel-2)}
+.memo-folder.sel{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.memo-folder .mf-count{font-size:11px;color:var(--muted)}
+.memo-folder.sel .mf-count{color:var(--on-accent);opacity:.85}
+.memo-folder.add{border-style:dashed;color:var(--muted)}
+.memo-folder.trash{margin-left:auto}
+.memo-actionsbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+.memo-card.pinned{border-color:var(--accent)}
+.mf-pin{display:inline-block;font-size:10.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+.memo-actions .iconbtn.on{color:var(--accent);background:var(--accent-soft)}
+.memo-actions .iconbtn[data-act="pin"],.memo-actions .iconbtn[data-act="restore"]{font-size:12px;padding:5px 8px;width:auto}
+.memo-move{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;height:28px;max-width:96px;font-size:12px;outline:none;cursor:pointer}
+/* Quill 에디터 — 앱 테마에 맞춤(라이트/다크 공용) */
+.memo-quill-toolbar.ql-toolbar.ql-snow,.ql-toolbar.ql-snow{border-color:var(--border);background:var(--panel-2);border-radius:10px 10px 0 0}
+.memo-quill.ql-container.ql-snow{border-color:var(--border);border-radius:0 0 12px 12px;font-family:inherit}
+.memo-quill .ql-editor{min-height:240px;max-height:60vh;font-size:15px;line-height:1.6;color:var(--text)}
+.memo-quill .ql-editor.ql-blank::before{color:var(--muted);font-style:normal;left:14px;right:14px}
+.memo-quill .ql-editor img{max-width:100%;height:auto;border-radius:8px}
+.memo-quill .ql-editor li[data-list="checked"]{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--muted)}
+.ql-snow .ql-stroke{stroke:var(--muted)}
+.ql-snow .ql-fill,.ql-snow .ql-stroke.ql-fill{fill:var(--muted)}
+.ql-snow .ql-picker{color:var(--muted)}
+.ql-snow.ql-toolbar button:hover .ql-stroke,.ql-snow .ql-toolbar button.ql-active .ql-stroke,.ql-snow.ql-toolbar button:hover .ql-fill,.ql-snow .ql-toolbar button.ql-active .ql-fill{stroke:var(--accent);fill:var(--accent)}
+.ql-snow.ql-toolbar button:hover,.ql-snow .ql-toolbar button.ql-active{color:var(--accent)}
+.ql-snow .ql-picker-options{background:var(--panel);border-color:var(--border)!important}
+.ql-snow .ql-picker.ql-expanded .ql-picker-label{border-color:var(--border)}
 .memo-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
 .memo-tool{border:1px solid transparent;background:none;color:var(--text);min-width:30px;height:30px;padding:0 9px;border-radius:8px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 .memo-tool:hover{background:var(--panel);border-color:var(--border)}
