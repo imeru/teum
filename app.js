@@ -260,6 +260,45 @@
     card.querySelector('[data-act="del"]').onclick=e=>{ e.stopPropagation(); delMemo(m.id); };
     return card;
   }
+  // 본문 리치 텍스트(HTML) ↔ 평문(body) 변환 — 미리보기/제목/검색은 평문 사용
+  function memoHtmlToText(html){
+    const d=document.createElement('div'); d.innerHTML=html||'';
+    d.querySelectorAll('input[type="checkbox"]').forEach(c=>c.replaceWith(document.createTextNode(c.checked?'[x] ':'[ ] ')));
+    d.querySelectorAll('br').forEach(b=>b.replaceWith(document.createTextNode('\n')));
+    d.querySelectorAll('p,div,li').forEach(b=>b.appendChild(document.createTextNode('\n')));
+    return (d.textContent||'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  }
+  function memoTextToHtml(t){ return esc(t||'').replace(/\n/g,'<br>'); }
+  function memoExec(cmd,val){ try{document.execCommand('styleWithCSS',false,true);}catch(e){} try{return document.execCommand(cmd,false,val);}catch(e){return false;} }
+  function memoDTInput(ms){ const d=new Date(ms||Date.now()); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  const MEMO_FONTS=[
+    {label:'기본 글꼴', css:''},
+    {label:'고딕', css:'-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif'},
+    {label:'명조', css:'"Nanum Myeongjo","Apple SD Gothic Neo",serif'},
+    {label:'모노', css:'ui-monospace,SFMono-Regular,Menlo,monospace'},
+  ];
+  const MEMO_SIZES=[{label:'작게',v:'2'},{label:'보통',v:'3'},{label:'크게',v:'5'},{label:'아주 크게',v:'7'}];
+  function memoInsertImage(bo,file,done){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const src=reader.result;
+      const img=new Image();
+      const place=url=>{ bo.focus(); memoExec('insertHTML',`<img src="${url}" alt="" class="memo-img"><br>`); done&&done(); };
+      img.onload=()=>{
+        let url=src; const MAX=1280;
+        if(img.width>MAX||img.height>MAX){
+          const sc=Math.min(MAX/img.width,MAX/img.height);
+          const cw=Math.round(img.width*sc), ch=Math.round(img.height*sc);
+          const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+          try{ cv.getContext('2d').drawImage(img,0,0,cw,ch); url=cv.toDataURL('image/jpeg',0.85); }catch(e){ url=src; }
+        }
+        place(url);
+      };
+      img.onerror=()=>place(src);
+      img.src=src;
+    };
+    reader.readAsDataURL(file);
+  }
   function memoEditor(m){
     const wrap=el(`<div class="memo-editor">
       <div class="memo-editor-head">
@@ -268,26 +307,79 @@
       </div>
       <input class="memo-edit-title" id="memoTitle" placeholder="제목 (생략하면 본문 첫 줄)" />
       <div class="memo-colors" id="memoColors"></div>
-      <textarea class="memo-edit-body" id="memoBody" rows="14" placeholder="계속 참고할 내용을 입력하세요"></textarea>
+      <div class="memo-toolbar" id="memoToolbar">
+        <select class="memo-tool-sel" id="memoFont" title="글꼴"></select>
+        <select class="memo-tool-sel" id="memoSize" title="글자 크기"></select>
+        <span class="memo-tool-sep"></span>
+        <button type="button" class="memo-tool" data-cmd="bold" title="볼드체" style="font-weight:800">B</button>
+        <button type="button" class="memo-tool" data-cmd="italic" title="기울임" style="font-style:italic;font-family:serif">I</button>
+        <button type="button" class="memo-tool" data-cmd="bullet" title="블릿포인트">• 목록</button>
+        <button type="button" class="memo-tool" data-cmd="check" title="체크박스">☑ 체크</button>
+        <span class="memo-tool-sep"></span>
+        <button type="button" class="memo-tool" data-cmd="image" title="그림 넣기 (클립보드 붙여넣기도 가능)">그림</button>
+      </div>
+      <div class="memo-edit-body" id="memoBody" contenteditable="true" spellcheck="false" data-ph="계속 참고할 내용을 입력하세요 — 클립보드 이미지도 붙여넣을 수 있어요"></div>
+      <div class="memo-dates" id="memoDates">
+        <label class="memo-date"><span>생성일시</span><input type="datetime-local" id="memoCreated" /></label>
+        <label class="memo-date"><span>최근 편집일시</span><input type="datetime-local" id="memoUpdated" /></label>
+      </div>
+      <input type="file" id="memoImgFile" accept="image/*" style="display:none" />
     </div>`);
     const ti=wrap.querySelector('#memoTitle'); ti.value=m.title||'';
-    const bo=wrap.querySelector('#memoBody'); bo.value=m.body||'';
-    const touch=()=>{ m.updatedAt=Date.now(); save(); }; // 입력 중엔 저장만(포커스 유지), render() 안 함
+    const bo=wrap.querySelector('#memoBody');
+    bo.innerHTML = (m.html!=null ? m.html : memoTextToHtml(m.body));
+    const cIn=wrap.querySelector('#memoCreated'), uIn=wrap.querySelector('#memoUpdated');
+    const refreshDates=()=>{ if(document.activeElement!==uIn) uIn.value=memoDTInput(m.updatedAt); if(document.activeElement!==cIn) cIn.value=memoDTInput(m.createdAt); };
+    const syncBody=()=>{ m.html=bo.innerHTML; m.body=memoHtmlToText(bo.innerHTML); m.updatedAt=Date.now(); save(); refreshDates(); };
+    const touch=()=>{ m.updatedAt=Date.now(); save(); refreshDates(); };
     ti.addEventListener('input',()=>{ m.title=ti.value; touch(); });
-    bo.addEventListener('input',()=>{ m.body=bo.value; touch(); });
+    bo.addEventListener('input', syncBody);
+    bo.addEventListener('change', e=>{ const c=e.target; if(c&&c.matches&&c.matches('input[type="checkbox"]')){ if(c.checked) c.setAttribute('checked','checked'); else c.removeAttribute('checked'); syncBody(); } });
+    bo.addEventListener('paste', e=>{
+      const items=(e.clipboardData&&e.clipboardData.items)||[];
+      for(const it of items){ if(it.type&&it.type.indexOf('image/')===0){ const f=it.getAsFile&&it.getAsFile(); if(f){ e.preventDefault(); memoInsertImage(bo,f,syncBody); return; } } }
+    });
+    // 색상
     const cp=wrap.querySelector('#memoColors');
     MEMO_COLORS.forEach(c=>{
       const b=el(`<button type="button" class="memo-color ${c?'':'none'} ${m.color===c?'sel':''}" title="${c?'색상':'색 없음'}"></button>`);
       if(c) b.style.background=c;
-      b.onclick=()=>{ m.color=c; touch(); render(); };
+      b.onclick=()=>{ m.color=c; m.updatedAt=Date.now(); save(); render(); };
       cp.appendChild(b);
     });
+    // 글꼴·크기 셀렉트 (선택 유지 위해 mousedown 시 포커스 보존)
+    const keepFocus=elm=>elm.addEventListener('mousedown',ev=>{ if(elm.tagName!=='SELECT') ev.preventDefault(); });
+    const fontSel=wrap.querySelector('#memoFont');
+    MEMO_FONTS.forEach((f,i)=>fontSel.appendChild(el(`<option value="${i}">${f.label}</option>`)));
+    fontSel.addEventListener('change',()=>{ bo.focus(); const f=MEMO_FONTS[+fontSel.value]; if(f) memoExec('fontName', f.css||'inherit'); syncBody(); fontSel.selectedIndex=0; });
+    const sizeSel=wrap.querySelector('#memoSize');
+    sizeSel.appendChild(el(`<option value="">크기</option>`));
+    MEMO_SIZES.forEach(s=>sizeSel.appendChild(el(`<option value="${s.v}">${s.label}</option>`)));
+    sizeSel.addEventListener('change',()=>{ bo.focus(); if(sizeSel.value) memoExec('fontSize', sizeSel.value); syncBody(); sizeSel.selectedIndex=0; });
+    // 서식 버튼
+    wrap.querySelectorAll('.memo-tool[data-cmd]').forEach(btn=>{
+      keepFocus(btn);
+      btn.addEventListener('click',()=>{
+        const cmd=btn.dataset.cmd; bo.focus();
+        if(cmd==='bold') memoExec('bold');
+        else if(cmd==='italic') memoExec('italic');
+        else if(cmd==='bullet') memoExec('insertUnorderedList');
+        else if(cmd==='check'){ memoExec('insertHTML','<label class="memo-chk"><input type="checkbox" contenteditable="false">&nbsp;</label><br>'); }
+        else if(cmd==='image'){ wrap.querySelector('#memoImgFile').click(); return; }
+        syncBody();
+      });
+    });
+    wrap.querySelector('#memoImgFile').addEventListener('change',e=>{ const f=e.target.files&&e.target.files[0]; if(f){ bo.focus(); memoInsertImage(bo,f,syncBody); } e.target.value=''; });
+    // 날짜/시간 (생성·최근 편집, 직접 수정 가능)
+    cIn.value=memoDTInput(m.createdAt); uIn.value=memoDTInput(m.updatedAt);
+    cIn.addEventListener('change',()=>{ const t=new Date(cIn.value).getTime(); if(!isNaN(t)){ m.createdAt=t; save(); } });
+    uIn.addEventListener('change',()=>{ const t=new Date(uIn.value).getTime(); if(!isNaN(t)){ m.updatedAt=t; save(); } });
     wrap.querySelector('#memoBack').onclick=()=>{ editingMemoId=null; render(); };
     wrap.querySelector('#memoDel').onclick=()=>{ delMemo(m.id); };
     return wrap;
   }
   function addMemo(){
-    const m={id:uid(),title:'',body:'',color:'',createdAt:Date.now(),updatedAt:Date.now()};
+    const m={id:uid(),title:'',body:'',html:'',color:'',createdAt:Date.now(),updatedAt:Date.now()};
     if(!Array.isArray(state.memos)) state.memos=[];
     state.memos.push(m);
     editingMemoId=m.id;

@@ -576,11 +576,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   $('#memoAdd').click();
   ck('새 메모 추가 → state 3개', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.length === 3);
   ck('추가 후 편집 에디터 표시', !!$('#memoBody') && !!$('#memoTitle'));
+  ck('리치 에디터 본문 contenteditable', $('#memoBody').getAttribute('contenteditable') === 'true');
+  ck('서식 툴바 버튼 존재(B·I·목록·체크·그림)', $$('.memo-tool[data-cmd]').length >= 5);
+  ck('글꼴·글자크기 셀렉트 존재', !!$('#memoFont') && !!$('#memoSize'));
+  ck('생성·편집 일시 입력 존재', !!$('#memoCreated') && !!$('#memoUpdated'));
   // 편집: 제목/본문 입력 (input 이벤트로 즉시 저장)
   $('#memoTitle').value = '회의 메모'; $('#memoTitle').dispatchEvent(new window.Event('input'));
-  $('#memoBody').value = '결정사항 정리'; $('#memoBody').dispatchEvent(new window.Event('input'));
+  $('#memoBody').innerHTML = '결정사항 정리'; $('#memoBody').dispatchEvent(new window.Event('input'));
   const saved = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.title === '회의 메모');
   ck('편집 내용 저장', saved && saved.body === '결정사항 정리');
+  ck('본문 html 저장', typeof saved.html === 'string' && saved.html.includes('결정사항'));
+  // 리치 본문 → 평문(body) 변환: 줄바꿈·체크박스
+  $('#memoBody').innerHTML = '첫줄<br>둘째줄<label class="memo-chk"><input type="checkbox" checked> 완료항목</label>';
+  $('#memoBody').dispatchEvent(new window.Event('input'));
+  const rich = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id);
+  ck('평문 변환: 줄바꿈 보존', rich.body.includes('첫줄') && rich.body.includes('둘째줄'));
+  ck('평문 변환: 체크 표시', rich.body.includes('[x]'));
+  // 일시 직접 수정
+  const cIn = $('#memoCreated'); cIn.value = '2020-01-02T03:04'; cIn.dispatchEvent(new window.Event('change'));
+  const edited = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id);
+  ck('생성일시 직접 수정 반영', new Date(edited.createdAt).getFullYear() === 2020);
+  // 서식 버튼 클릭 시 런타임 에러 없음(execCommand 미구현 환경 안전)
+  $$('.memo-tool[data-cmd]').find(b => b.dataset.cmd === 'bold').click();
+  ck('서식 버튼 클릭 무에러', !getErr());
   // 색상 선택
   $$('#memoColors .memo-color').find(b => !b.classList.contains('none')).click();
   ck('색상 선택 저장', !!JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.title === '회의 메모').color);

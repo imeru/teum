@@ -100,8 +100,22 @@ input,textarea,select{font-family:inherit}
 .memo-editor-head{display:flex;align-items:center;justify-content:space-between}
 .memo-edit-title{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:10px;padding:12px 14px;font-size:17px;font-weight:600;outline:none}
 .memo-edit-title:focus{border-color:var(--accent)}
-.memo-edit-body{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:12px;padding:14px;font-size:15px;line-height:1.6;outline:none;resize:vertical;min-height:240px}
+.memo-edit-body{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:12px;padding:14px;font-size:15px;line-height:1.6;outline:none;min-height:240px;max-height:60vh;overflow-y:auto;word-break:break-word}
 .memo-edit-body:focus{border-color:var(--accent)}
+.memo-edit-body:empty::before{content:attr(data-ph);color:var(--muted);pointer-events:none}
+.memo-edit-body ul{margin:6px 0;padding-left:22px}
+.memo-edit-body img.memo-img{max-width:100%;height:auto;border-radius:8px;margin:6px 0;display:block}
+.memo-chk{display:flex;align-items:flex-start;gap:8px;margin:2px 0}
+.memo-chk input[type="checkbox"]{margin-top:4px;flex:0 0 auto;width:16px;height:16px;accent-color:var(--green);cursor:pointer}
+.memo-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
+.memo-tool{border:1px solid transparent;background:none;color:var(--text);min-width:30px;height:30px;padding:0 9px;border-radius:8px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.memo-tool:hover{background:var(--panel);border-color:var(--border)}
+.memo-tool-sel{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;height:30px;padding:0 6px;font-size:13px;outline:none;cursor:pointer}
+.memo-tool-sep{width:1px;height:20px;background:var(--border);margin:0 3px;flex:0 0 auto}
+.memo-dates{display:flex;flex-wrap:wrap;gap:14px}
+.memo-date{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.memo-date input{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;padding:6px 8px;font-size:13px;outline:none;font-family:inherit}
+.memo-date input:focus{border-color:var(--accent)}
 .memo-colors{display:flex;gap:8px;align-items:center}
 .memo-color{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);padding:0;cursor:pointer}
 .memo-color.none{background:var(--panel-2);position:relative}
