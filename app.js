@@ -1697,8 +1697,8 @@
   async function initSupa(){
     if(!(cloud.url&&cloud.key)){ supa=null; authUser=null; updateSyncBadge(); return; }
     try{
-      const mod=await import('https://esm.sh/@supabase/supabase-js@2');
-      supa=mod.createClient(cloud.url,cloud.key);
+      if(typeof supabase==='undefined'||!supabase.createClient) throw new Error('supabase 라이브러리 미로드');
+      supa=supabase.createClient(cloud.url,cloud.key); // 로컬 번들(supabase.js) 전역 사용 — CDN 의존 제거, 오프라인 대응
       // 기존 세션 확인 + 상태 변화 구독 (Google 로그인)
       supa.auth.getSession().then(({data})=>{
         authUser=data&&data.session?data.session.user:null;
