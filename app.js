@@ -19,6 +19,7 @@
   let currentView = 'today';
   let currentFilter = null; // {type:'project'|'tag', value}
   let editingId = null;
+  let editingMemoId = null; // 메모 편집 중인 id (없으면 목록 보기)
   let selectedPrio = 4;
   let projColor = PROJECT_COLORS[0];
   let supa = null;          // supabase client
@@ -48,6 +49,7 @@
       top3: {},
       events: [],
       holidays: [],
+      memos: [],       // 참고용 메모 [{id,title,body,color,createdAt,updatedAt}] — 완료 개념 없음
       weekNotes: {},
       deletions: {},   // {id: deletedAt} — 동기화 병합 시 삭제 보존(tombstone)
       updatedAt: Date.now()
@@ -76,6 +78,7 @@
     });
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
     if(!s.weekNotes) s.weekNotes={};
+    if(!Array.isArray(s.memos)) s.memos=[];
     if(!s.deletions||typeof s.deletions!=='object') s.deletions={};
     return s;
   }
@@ -157,7 +160,7 @@
   function countFor(fn){ return state.tasks.filter(fn).length; }
 
   // 다음 실행 시 복원할 화면(필터 뷰·설정 제외)
-  const RESTORABLE_VIEWS = new Set(['today','suggest','plan','pomodoro','gtdboard','inbox','next','waiting','someday','done','review','weekreview']);
+  const RESTORABLE_VIEWS = new Set(['today','suggest','plan','pomodoro','gtdboard','memo','inbox','next','waiting','someday','done','review','weekreview']);
   function setView(v, filter=null){
     currentView=v; currentFilter=filter;
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active', n.dataset.view===v && !filter));
@@ -179,6 +182,7 @@
     if(currentView==='gtdboard'){ renderGtdBoard(); return; }
     if(currentView==='guide'){ renderGuide(); return; }
     if(currentView==='settings'){ renderSettings(); return; }
+    if(currentView==='memo'){ renderMemo(); return; }
 
     let tasks, title, sub;
     if(currentFilter){
@@ -212,6 +216,89 @@
     content.appendChild(list);
   }
 
+  // ---------- 메모 (참고용 노트 — 완료 개념 없이 계속 보존) ----------
+  // 제목이 비면 본문 첫 줄로 대체. 둘 다 비면 '제목 없음'.
+  function memoDisplayTitle(m){
+    const t=(m.title||'').trim();
+    if(t) return t;
+    const first=(m.body||'').split('\n').map(s=>s.trim()).find(Boolean);
+    return first || '제목 없음';
+  }
+  function renderMemo(){
+    $('#viewTitle').textContent='메모';
+    $('#viewSub').textContent='완료해도 사라지지 않는, 계속 참고할 정보';
+    document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='memo'&&!currentFilter));
+    content.innerHTML='';
+    const editing=editingMemoId ? (state.memos||[]).find(m=>m.id===editingMemoId) : null;
+    if(editingMemoId && !editing) editingMemoId=null;
+    if(editing){ content.appendChild(memoEditor(editing)); return; }
+    const add=el(`<div style="margin-bottom:16px"><button class="btn primary" id="memoAdd">${cic('plus')} 새 메모</button></div>`);
+    add.querySelector('#memoAdd').onclick=addMemo;
+    content.appendChild(add);
+    const memos=(state.memos||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    if(!memos.length){
+      content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />아직 메모가 없습니다. 위에서 새 메모를 추가하세요.</div>`));
+      return;
+    }
+    const list=el('<div class="memo-list"></div>');
+    memos.forEach(m=>list.appendChild(memoCard(m)));
+    content.appendChild(list);
+  }
+  function memoCard(m){
+    const body=(m.body||'').trim();
+    const card=el(`<div class="memo-card" data-id="${m.id}">
+      <div class="memo-card-body">
+        <div class="memo-title">${esc(memoDisplayTitle(m))}</div>
+        ${body?`<div class="memo-preview">${esc(body)}</div>`:''}
+      </div>
+      <div class="memo-actions">
+        <button class="iconbtn" data-act="del" title="삭제">${svgIco('trash')}</button>
+      </div>
+    </div>`);
+    if(m.color) card.style.borderLeft=`3px solid ${m.color}`;
+    card.querySelector('.memo-card-body').onclick=()=>{ editingMemoId=m.id; render(); };
+    card.querySelector('[data-act="del"]').onclick=e=>{ e.stopPropagation(); delMemo(m.id); };
+    return card;
+  }
+  function memoEditor(m){
+    const wrap=el(`<div class="memo-editor">
+      <div class="memo-editor-head">
+        <button class="btn sm" id="memoBack">${cic('plus')} 메모 목록</button>
+        <button class="btn sm" id="memoDel" style="color:var(--p1)">삭제</button>
+      </div>
+      <input class="memo-edit-title" id="memoTitle" placeholder="제목 (생략하면 본문 첫 줄)" />
+      <div class="memo-colors" id="memoColors"></div>
+      <textarea class="memo-edit-body" id="memoBody" rows="14" placeholder="계속 참고할 내용을 입력하세요"></textarea>
+    </div>`);
+    const ti=wrap.querySelector('#memoTitle'); ti.value=m.title||'';
+    const bo=wrap.querySelector('#memoBody'); bo.value=m.body||'';
+    const touch=()=>{ m.updatedAt=Date.now(); save(); }; // 입력 중엔 저장만(포커스 유지), render() 안 함
+    ti.addEventListener('input',()=>{ m.title=ti.value; touch(); });
+    bo.addEventListener('input',()=>{ m.body=bo.value; touch(); });
+    const cp=wrap.querySelector('#memoColors');
+    MEMO_COLORS.forEach(c=>{
+      const b=el(`<button type="button" class="memo-color ${c?'':'none'} ${m.color===c?'sel':''}" title="${c?'색상':'색 없음'}"></button>`);
+      if(c) b.style.background=c;
+      b.onclick=()=>{ m.color=c; touch(); render(); };
+      cp.appendChild(b);
+    });
+    wrap.querySelector('#memoBack').onclick=()=>{ editingMemoId=null; render(); };
+    wrap.querySelector('#memoDel').onclick=()=>{ delMemo(m.id); };
+    return wrap;
+  }
+  function addMemo(){
+    const m={id:uid(),title:'',body:'',color:'',createdAt:Date.now(),updatedAt:Date.now()};
+    if(!Array.isArray(state.memos)) state.memos=[];
+    state.memos.push(m);
+    editingMemoId=m.id;
+    save(); render();
+  }
+  function delMemo(id){
+    state.memos=(state.memos||[]).filter(x=>x.id!==id);
+    if(!state.deletions)state.deletions={}; state.deletions[id]=Date.now(); // tombstone(동기화 병합용)
+    if(editingMemoId===id) editingMemoId=null;
+    save(); render();
+  }
   // sortTasks·추천점수·describeEvent·isPastEvent·설치헬퍼는 logic.js로 분리됨
 
   // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
@@ -1143,6 +1230,7 @@
     // GTD 보드: 처리 대기(inbox+다음행동+대기+언젠가) 합계
     set('#c-gtd', countFor(t=>!isDone(t)&&['inbox','next','waiting','someday'].includes(t.status)));
     set('#c-pomo', todaySessions().length);
+    set('#c-memo', (state.memos||[]).length);
   }
   function todaySessions(){ return (state.sessions||[]).filter(s=>s.date===todayStr()); }
   function sessionsForTask(id){ return (state.sessions||[]).filter(s=>s.taskId===id).length; }

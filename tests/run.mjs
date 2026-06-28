@@ -224,6 +224,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const st = JSON.parse(localStorage.getItem('flowdo.state.v1'));
   ck('subtasks 보강', Array.isArray(st.tasks[0].subtasks));
   ck('events 보강', Array.isArray(st.events));
+  ck('memos 보강', Array.isArray(st.memos));
   ck('settings.notify 보강', st.settings.notify === false);
   ck('데이터 반영', st.tasks[0].title === '옛할일');
 }
@@ -554,6 +555,63 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('tbClampMin 상한', w.tbClampMin(2000, 8, 24, 10) === 1430);
   ck('tbClampMin 하한', w.tbClampMin(100, 8, 24, 10) === 480);
   ck('tbYToMin 변환+스냅+클램프', w.tbYToMin(67, 8, 24, 10, 1, 0) === 550);
+}
+
+// ───────────────────────── 20) 메모 (참고용 노트) ─────────────────────────
+{
+  section('메모');
+  const { window, $, $$, getErr } = boot(baseState({
+    memos: [
+      { id: 'm1', title: '참고자료', body: '링크 모음\n2번째 줄', color: '', createdAt: 1, updatedAt: 10 },
+      { id: 'm2', title: '', body: '제목없는 메모 본문', color: '#83bfa7', createdAt: 2, updatedAt: 20 },
+    ]
+  }), { lastview: 'memo' });
+  ck('런타임 에러 없음', !getErr());
+  ck('사이드바 메모 메뉴 존재', !!$('.nav[data-view="memo"]'));
+  ck('메모 뷰 진입(lastview)', $('#viewTitle').textContent === '메모');
+  ck('메모 카드 2개', $$('.memo-card').length === 2);
+  ck('제목 없으면 본문 첫 줄 표시', $$('.memo-card .memo-title').some(e => e.textContent.includes('제목없는 메모 본문')));
+  ck('색상 메모 좌측 강조선', $$('.memo-card').some(c => c.style.borderLeft && c.style.borderLeft.includes('3px')));
+  // 새 메모 추가 → 에디터 열림
+  $('#memoAdd').click();
+  ck('새 메모 추가 → state 3개', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.length === 3);
+  ck('추가 후 편집 에디터 표시', !!$('#memoBody') && !!$('#memoTitle'));
+  // 편집: 제목/본문 입력 (input 이벤트로 즉시 저장)
+  $('#memoTitle').value = '회의 메모'; $('#memoTitle').dispatchEvent(new window.Event('input'));
+  $('#memoBody').value = '결정사항 정리'; $('#memoBody').dispatchEvent(new window.Event('input'));
+  const saved = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.title === '회의 메모');
+  ck('편집 내용 저장', saved && saved.body === '결정사항 정리');
+  // 색상 선택
+  $$('#memoColors .memo-color').find(b => !b.classList.contains('none')).click();
+  ck('색상 선택 저장', !!JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.title === '회의 메모').color);
+  // 목록으로 돌아가기
+  $('#memoBack').click();
+  ck('목록 복귀 → 카드 3개', $$('.memo-card').length === 3);
+  // 기존 메모 클릭 → 편집 열림
+  $$('.memo-card .memo-card-body').find(e => e.textContent.includes('참고자료')).click();
+  ck('카드 클릭 → 편집 열림', $('#memoTitle').value === '참고자료');
+  $('#memoBack').click();
+  // 삭제 (m1) → 카드 수 감소 + tombstone
+  const before = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.length;
+  $$('.memo-card').find(c => c.textContent.includes('참고자료')).querySelector('[data-act="del"]').click();
+  const after = JSON.parse(localStorage.getItem('flowdo.state.v1'));
+  ck('삭제 → 메모 수 감소', after.memos.length === before - 1);
+  ck('삭제 → tombstone 기록', !!(after.deletions && after.deletions['m1']));
+  ck('삭제 → 해당 메모 제거', !after.memos.some(m => m.id === 'm1'));
+  // mergeStates: memos 병합 (tasks와 동일 규칙)
+  const M = window.mergeStates;
+  let mg = M({ memos: [{ id: 'ML', title: '로컬메모', updatedAt: 5 }], updatedAt: 10 },
+             { memos: [{ id: 'MR', title: '원격메모', updatedAt: 5 }], updatedAt: 20 });
+  ck('merge memos: 양쪽 보존', mg.memos.some(x => x.id === 'ML') && mg.memos.some(x => x.id === 'MR'));
+  mg = M({ memos: [{ id: 'MX', title: '로컬최신', updatedAt: 100 }], updatedAt: 100 },
+         { memos: [{ id: 'MX', title: '원격구', updatedAt: 50 }], updatedAt: 200 });
+  ck('merge memos: 충돌 updatedAt 최신 우선', mg.memos.find(x => x.id === 'MX').title === '로컬최신');
+  mg = M({ memos: [], deletions: { MD: 100 }, updatedAt: 100 },
+         { memos: [{ id: 'MD', updatedAt: 50 }], updatedAt: 200 });
+  ck('merge memos: tombstone 삭제 보존', !mg.memos.some(x => x.id === 'MD'));
+  mg = M({ memos: [], deletions: { MD: 100 }, updatedAt: 100 },
+         { memos: [{ id: 'MD', title: '삭제후편집', updatedAt: 150 }], updatedAt: 200 });
+  ck('merge memos: 삭제보다 최신 편집은 부활', mg.memos.some(x => x.id === 'MD'));
 }
 
 // ───────────────────────── 결과 ─────────────────────────

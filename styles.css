@@ -87,6 +87,26 @@ input,textarea,select{font-family:inherit}
 .empty{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px}
 .empty .big{font-size:40px;margin-bottom:10px}
 .empty .brand-logo{width:220px;max-width:70%;height:auto;display:block;margin:0 auto 18px;opacity:.9}
+/* 메모 (참고용 노트) — .task 톤 재사용, 차분·미니멀 */
+.memo-list{display:flex;flex-direction:column;gap:8px}
+.memo-card{display:flex;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:15px 18px;box-shadow:var(--shadow);transition:.12s}
+.memo-card:hover{border-color:#cdd0e0}
+.memo-card-body{flex:1;min-width:0;cursor:pointer}
+.memo-title{font-size:15px;font-weight:600;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+.memo-preview{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.memo-actions{display:flex;gap:2px;opacity:0;transition:.12s}
+.memo-card:hover .memo-actions{opacity:1}
+.memo-editor{display:flex;flex-direction:column;gap:12px;max-width:680px}
+.memo-editor-head{display:flex;align-items:center;justify-content:space-between}
+.memo-edit-title{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:10px;padding:12px 14px;font-size:17px;font-weight:600;outline:none}
+.memo-edit-title:focus{border-color:var(--accent)}
+.memo-edit-body{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:12px;padding:14px;font-size:15px;line-height:1.6;outline:none;resize:vertical;min-height:240px}
+.memo-edit-body:focus{border-color:var(--accent)}
+.memo-colors{display:flex;gap:8px;align-items:center}
+.memo-color{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);padding:0;cursor:pointer}
+.memo-color.none{background:var(--panel-2);position:relative}
+.memo-color.none::after{content:'';position:absolute;left:4px;right:4px;top:50%;border-top:1.5px solid var(--muted);transform:rotate(-45deg)}
+.memo-color.sel{outline:2px solid var(--accent);outline-offset:2px}
 /* 로그인 게이트 */
 .auth-gate{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);align-items:center;justify-content:center;padding:24px}
 .auth-gate.show{display:flex}
