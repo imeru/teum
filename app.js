@@ -262,11 +262,87 @@
   }
   // 본문 리치 텍스트(HTML) ↔ 평문(body) 변환 — 미리보기/제목/검색은 평문 사용
   function memoHtmlToText(html){
-    const d=document.createElement('div'); d.innerHTML=html||'';
+    const d=document.createElement('div'); d.innerHTML=html||''; memoNormalize(d);
+    d.querySelectorAll('.memo-chk').forEach(line=>{
+      const checked=line.classList.contains('checked') || !!(line.querySelector('input[type="checkbox"]')||{}).checked;
+      const box=line.querySelector('.memo-chk-box'); if(box) box.remove();
+      line.querySelectorAll('input[type="checkbox"]').forEach(c=>c.remove());
+      line.insertBefore(document.createTextNode(checked?'[x] ':'[ ] '), line.firstChild);
+    });
     d.querySelectorAll('input[type="checkbox"]').forEach(c=>c.replaceWith(document.createTextNode(c.checked?'[x] ':'[ ] ')));
     d.querySelectorAll('br').forEach(b=>b.replaceWith(document.createTextNode('\n')));
     d.querySelectorAll('p,div,li').forEach(b=>b.appendChild(document.createTextNode('\n')));
     return (d.textContent||'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  }
+  // ----- OneNote식 체크박스 (박스만 클릭 토글, 텍스트는 편집 가능) -----
+  function memoSetCaret(node,offset){ try{ const r=document.createRange(),s=document.getSelection(); r.setStart(node,offset); r.collapse(true); s.removeAllRanges(); s.addRange(r); }catch(e){} }
+  function memoBox(checked){ const b=document.createElement('span'); b.className='memo-chk-box'; b.setAttribute('contenteditable','false'); b.setAttribute('role','checkbox'); b.setAttribute('aria-checked',checked?'true':'false'); return b; }
+  function memoMakeCheckLine(div){
+    if(div.classList.contains('memo-chk')) return div;
+    const t=document.createElement('span'); t.className='memo-chk-t';
+    while(div.firstChild){ const n=div.firstChild; if(n.nodeType===1&&n.tagName==='BR'){ div.removeChild(n); continue; } t.appendChild(n); }
+    div.appendChild(memoBox(false)); div.appendChild(t); div.classList.add('memo-chk');
+    return div;
+  }
+  function memoUncheckLine(div){
+    const box=div.querySelector('.memo-chk-box'); if(box) box.remove();
+    const t=div.querySelector('.memo-chk-t'); if(t){ while(t.firstChild) div.insertBefore(t.firstChild,t); t.remove(); }
+    div.classList.remove('memo-chk','checked');
+    if(!div.firstChild) div.appendChild(document.createElement('br'));
+  }
+  function memoWrapInlineLine(bo,node){
+    let start=node; while(start.previousSibling && !(start.previousSibling.nodeType===1&&start.previousSibling.tagName==='BR')) start=start.previousSibling;
+    let end=node; while(end.nextSibling && !(end.nextSibling.nodeType===1&&end.nextSibling.tagName==='BR')) end=end.nextSibling;
+    const div=document.createElement('div'); bo.insertBefore(div,start);
+    let cur=start; while(cur){ const nx=cur.nextSibling; div.appendChild(cur); if(cur===end) break; cur=nx; }
+    if(div.nextSibling && div.nextSibling.nodeType===1 && div.nextSibling.tagName==='BR') div.nextSibling.remove();
+    if(!div.firstChild) div.appendChild(document.createElement('br'));
+    return div;
+  }
+  function memoLineBlock(bo){
+    const s=document.getSelection(); if(!s||!s.rangeCount) return null;
+    const rng=s.getRangeAt(0); let node=rng.startContainer;
+    if(node===bo){ node=bo.childNodes[rng.startOffset]||bo.childNodes[rng.startOffset-1]||bo.lastChild; }
+    if(!node) return null;
+    let n=node; while(n&&n.parentNode&&n.parentNode!==bo) n=n.parentNode;
+    if(!n||n.parentNode!==bo) return null;
+    if(n.nodeType===1&&(n.tagName==='DIV'||n.tagName==='P'||n.tagName==='LI')) return n;
+    return memoWrapInlineLine(bo,n);
+  }
+  function memoToggleCheck(bo){
+    bo.focus(); const block=memoLineBlock(bo); if(!block) return;
+    if(block.tagName==='LI') return;
+    if(block.classList && block.classList.contains('memo-chk')){
+      memoUncheckLine(block); memoSetCaret(block, block.childNodes.length);
+    } else {
+      memoMakeCheckLine(block); const t=block.querySelector('.memo-chk-t'); if(t) memoSetCaret(t, t.childNodes.length);
+    }
+  }
+  // 저장된 옛 구조(label>input)·br 줄을 새 구조/블록으로 정규화 (에디터 로드 시 1회)
+  function memoMigrateChecks(bo){
+    bo.querySelectorAll('label.memo-chk').forEach(lab=>{
+      const inp=lab.querySelector('input[type="checkbox"]');
+      const checked=!!(inp&&(inp.checked||inp.hasAttribute('checked')));
+      const div=document.createElement('div'); div.className='memo-chk'+(checked?' checked':'');
+      const t=document.createElement('span'); t.className='memo-chk-t';
+      Array.from(lab.childNodes).forEach(n=>{ if(n!==inp) t.appendChild(n); });
+      div.appendChild(memoBox(checked)); div.appendChild(t);
+      const nb=lab.nextSibling; lab.replaceWith(div);
+      if(nb&&nb.nodeType===1&&nb.tagName==='BR') nb.remove();
+    });
+  }
+  function memoNormalize(bo){
+    const frag=document.createDocumentFragment(); let line=null;
+    const isBlock=n=>n.nodeType===1&&/^(DIV|P|UL|OL|BLOCKQUOTE|H[1-6]|PRE)$/.test(n.tagName);
+    Array.from(bo.childNodes).forEach(node=>{
+      if(node.nodeType===1&&node.tagName==='BR'){ if(line===null) line=frag.appendChild(document.createElement('div')); line=null; return; }
+      if(isBlock(node)){ line=null; frag.appendChild(node); return; }
+      if(line===null){ line=document.createElement('div'); frag.appendChild(line); }
+      line.appendChild(node);
+    });
+    bo.innerHTML=''; bo.appendChild(frag);
+    bo.querySelectorAll('div').forEach(d=>{ if(!d.firstChild&&!d.classList.contains('memo-chk')) d.appendChild(document.createElement('br')); });
+    if(!bo.firstChild){ const d=document.createElement('div'); d.appendChild(document.createElement('br')); bo.appendChild(d); }
   }
   function memoTextToHtml(t){ return esc(t||'').replace(/\n/g,'<br>'); }
   function memoExec(cmd,val){ try{document.execCommand('styleWithCSS',false,true);}catch(e){} try{return document.execCommand(cmd,false,val);}catch(e){return false;} }
@@ -331,6 +407,7 @@
     const ti=wrap.querySelector('#memoTitle'); ti.value=m.title||'';
     const bo=wrap.querySelector('#memoBody');
     bo.innerHTML = (m.html!=null ? m.html : memoTextToHtml(m.body));
+    memoMigrateChecks(bo); memoNormalize(bo);
     const cIn=wrap.querySelector('#memoCreated'), uIn=wrap.querySelector('#memoUpdated');
     const savedEl=wrap.querySelector('#memoSaved');
     let savedTimer=null;
@@ -342,7 +419,31 @@
     const touch=()=>{ m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
     ti.addEventListener('input',()=>{ m.title=ti.value; touch(); });
     bo.addEventListener('input', syncBody);
-    bo.addEventListener('change', e=>{ const c=e.target; if(c&&c.matches&&c.matches('input[type="checkbox"]')){ if(c.checked) c.setAttribute('checked','checked'); else c.removeAttribute('checked'); syncBody(); } });
+    // 체크박스: 박스(.memo-chk-box)만 클릭 토글 → 텍스트 편집 보존
+    bo.addEventListener('click', e=>{
+      const box=e.target.closest&&e.target.closest('.memo-chk-box'); if(!box) return;
+      e.preventDefault(); const line=box.closest('.memo-chk'); if(!line) return;
+      const on=line.classList.toggle('checked'); box.setAttribute('aria-checked', on?'true':'false'); syncBody();
+    });
+    // 체크 줄에서 Enter: 빈 줄이면 체크 해제(일반 줄), 아니면 다음 체크 줄 생성
+    bo.addEventListener('keydown', e=>{
+      if(e.key!=='Enter'||e.shiftKey||e.isComposing) return;
+      const s=document.getSelection(); if(!s.rangeCount) return;
+      let node=s.getRangeAt(0).startContainer; if(node.nodeType===3) node=node.parentNode;
+      const line=node&&node.closest?node.closest('.memo-chk'):null; if(!line||!bo.contains(line)) return;
+      e.preventDefault();
+      const t=line.querySelector('.memo-chk-t');
+      if(!t||!(t.textContent||'').trim()){
+        const nd=document.createElement('div'); nd.appendChild(document.createElement('br'));
+        line.replaceWith(nd); memoSetCaret(nd,0);
+      } else {
+        const nd=document.createElement('div'); nd.className='memo-chk';
+        const nt=document.createElement('span'); nt.className='memo-chk-t';
+        nd.appendChild(memoBox(false)); nd.appendChild(nt);
+        line.after(nd); memoSetCaret(nt,0);
+      }
+      syncBody();
+    });
     bo.addEventListener('paste', e=>{
       const items=(e.clipboardData&&e.clipboardData.items)||[];
       for(const it of items){ if(it.type&&it.type.indexOf('image/')===0){ const f=it.getAsFile&&it.getAsFile(); if(f){ e.preventDefault(); memoInsertImage(bo,f,syncBody); return; } } }
@@ -372,7 +473,7 @@
         if(cmd==='bold') memoExec('bold');
         else if(cmd==='italic') memoExec('italic');
         else if(cmd==='bullet') memoExec('insertUnorderedList');
-        else if(cmd==='check'){ memoExec('insertHTML','<label class="memo-chk"><input type="checkbox" contenteditable="false">&nbsp;</label><br>'); }
+        else if(cmd==='check'){ memoToggleCheck(bo); }
         else if(cmd==='image'){ wrap.querySelector('#memoImgFile').click(); return; }
         syncBody();
       });

@@ -595,6 +595,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const rich = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id);
   ck('평문 변환: 줄바꿈 보존', rich.body.includes('첫줄') && rich.body.includes('둘째줄'));
   ck('평문 변환: 체크 표시', rich.body.includes('[x]'));
+  // 새 체크박스 구조: 박스만 클릭해 토글(텍스트는 편집 보존), 체크 시 취소선 클래스
+  $('#memoBody').innerHTML = '<div class="memo-chk"><span class="memo-chk-box" contenteditable="false"></span><span class="memo-chk-t">할일항목</span></div>';
+  $('#memoBody').dispatchEvent(new window.Event('input'));
+  const box = $('#memoBody .memo-chk-box');
+  ck('체크박스 박스 요소 존재', !!box);
+  box.click();
+  ck('박스 클릭 → checked 클래스', $('#memoBody .memo-chk').classList.contains('checked'));
+  ck('체크 시 평문 [x]', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id).body.includes('[x]'));
+  box.click();
+  ck('박스 재클릭 → checked 해제', !$('#memoBody .memo-chk').classList.contains('checked'));
+  ck('해제 시 평문 [ ]', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id).body.includes('[ ]'));
+  // 텍스트 영역 클릭은 토글하지 않음(편집 보존)
+  $('#memoBody .memo-chk').classList.add('checked');
+  $('#memoBody .memo-chk-t').click();
+  ck('텍스트 클릭은 토글 안 함', $('#memoBody .memo-chk').classList.contains('checked'));
   // 일시 직접 수정
   const cIn = $('#memoCreated'); cIn.value = '2020-01-02T03:04'; cIn.dispatchEvent(new window.Event('change'));
   const edited = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id);
