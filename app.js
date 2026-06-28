@@ -48,6 +48,7 @@
       events: [],
       holidays: [],
       weekNotes: {},
+      deletions: {},   // {id: deletedAt} — 동기화 병합 시 삭제 보존(tombstone)
       updatedAt: Date.now()
     };
   }
@@ -74,6 +75,7 @@
     });
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
     if(!s.weekNotes) s.weekNotes={};
+    if(!s.deletions||typeof s.deletions!=='object') s.deletions={};
     return s;
   }
   function loadCfg(){
@@ -344,7 +346,9 @@
     t.updatedAt=Date.now(); save(); render();
   }
   function delTask(id){
-    state.tasks=state.tasks.filter(x=>x.id!==id); save(); render();
+    state.tasks=state.tasks.filter(x=>x.id!==id);
+    if(!state.deletions)state.deletions={}; state.deletions[id]=Date.now(); // tombstone(동기화 병합용)
+    save(); render();
   }
 
   // ---------- Time-box (Plan) view ----------
@@ -1006,7 +1010,7 @@
         <span class="ev-info" style="cursor:pointer"><b>${esc(ev.title)}</b><small>${esc(describeEvent(ev))}</small></span>
         <button class="iconbtn" title="삭제">✕</button></div>`);
       row.querySelector('.ev-info').onclick=()=>openEvent(ev.id);
-      row.querySelector('button').onclick=()=>{ state.events=state.events.filter(x=>x.id!==ev.id); save(); renderPlan(); };
+      row.querySelector('button').onclick=()=>{ state.events=state.events.filter(x=>x.id!==ev.id); if(!state.deletions)state.deletions={}; state.deletions[ev.id]=Date.now(); save(); renderPlan(); };
       host.appendChild(row);
     };
     if(!current.length && !showPastEvents) host.appendChild(el(`<div class="note" style="padding:4px 2px">예정된 일정이 없습니다.</div>`));
@@ -1744,7 +1748,8 @@
     syncTimer=setTimeout(()=>cloudPush(false),1200);
   }
   // 내용 시그니처(휘발성 updatedAt 제외) — 실제 변경이 없으면 업로드를 건너뛰기 위함
-  function syncSig(){ const c=Object.assign({},state); delete c.updatedAt; return JSON.stringify(c); }
+  function sigOf(s){ const c=Object.assign({},s); delete c.updatedAt; return JSON.stringify(c); }
+  function syncSig(){ return sigOf(state); }
   async function cloudPush(manual){
     if(!supa||!syncKey()){ if(manual) alert('먼저 연결(또는 로그인)을 설정하세요.'); return; }
     const sig=syncSig();
@@ -1764,10 +1769,16 @@
       if(error) throw error;
       if(data&&data.data){
         if(manual || data.updated_at>(state.updatedAt||0)){
-          state=migrate(data.data); localStorage.setItem(LS_KEY,JSON.stringify(state));
-          lastSyncSig=syncSig(); // 방금 받은 내용은 다시 올리지 않도록 시그니처 갱신
+          const remote=migrate(data.data);
+          const merged=mergeStates(state, remote);       // 로컬+서버 항목 단위 병합(손실 방지)
+          const localContributed = sigOf(merged)!==sigOf(remote); // 로컬에만 있던 변경이 합쳐졌나
+          state=merged;
+          if(localContributed) state.updatedAt=Date.now();
+          localStorage.setItem(LS_KEY,JSON.stringify(state));
           render();
-          if(manual) toast('서버에서 불러왔습니다.');
+          if(localContributed) cloudPush(false);          // 병합본을 서버로 반영(convergence)
+          else lastSyncSig=syncSig();                      // 서버와 동일 → 재업로드 방지
+          if(manual) toast(localContributed?'서버 내용과 병합했습니다.':'서버에서 불러왔습니다.');
         }
       } else if(manual){ toast('서버에 데이터가 없어 현재 내용을 올립니다.'); cloudPush(true); }
     }catch(err){ console.warn(err); if(manual) alert('불러오기 실패: '+(err.message||err)); }
@@ -1818,7 +1829,7 @@
   $('#projCancelBtn').onclick=()=>$('#projOverlay').classList.remove('show');
   $('#evSaveBtn').onclick=saveEvent;
   $('#evCancelBtn').onclick=()=>$('#eventOverlay').classList.remove('show');
-  $('#evDeleteBtn').onclick=()=>{ if(editingEventId){ state.events=(state.events||[]).filter(x=>x.id!==editingEventId); save(); $('#eventOverlay').classList.remove('show'); renderPlan(); } };
+  $('#evDeleteBtn').onclick=()=>{ if(editingEventId){ state.events=(state.events||[]).filter(x=>x.id!==editingEventId); if(!state.deletions)state.deletions={}; state.deletions[editingEventId]=Date.now(); save(); $('#eventOverlay').classList.remove('show'); renderPlan(); } };
   $('#ev-freq').onchange=updateEventModalVisibility;
   $('#ev-allday').onchange=updateEventModalVisibility;
   $('#f-add-sub').onclick=addSubtask;

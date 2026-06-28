@@ -78,3 +78,39 @@ function installInstructions(){
   if(/android/i.test(ua)) return 'Chrome 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 선택하세요.';
   return '브라우저 주소창 오른쪽의 설치 아이콘(⊕/모니터 모양)을 누르거나, 메뉴에서 "앱 설치"를 선택하세요.';
 }
+
+// 동기화 병합(순수): 로컬+원격을 항목 단위로 합쳐 기기 간 데이터 손실 방지.
+//  - tasks: id별 updatedAt 최신 우선
+//  - sessions: id 합집합(추가형 로그)
+//  - projects/events: id 합집합(최상위 updatedAt이 큰 쪽이 충돌 시 우선)
+//  - deletions(tombstone {id:ts}): 합집합(최신 시각). 항목의 updatedAt보다 삭제가 최신이면 제외
+//  - settings/top3/weekNotes/holidays: 최상위 updatedAt이 큰 쪽 채택(스칼라성)
+function mergeStates(local, remote){
+  const L=local||{}, R=remote||{};
+  const newer = (R.updatedAt||0) >= (L.updatedAt||0) ? R : L;
+  const older = newer===R ? L : R;
+  const tomb={};
+  for(const m of [L.deletions||{}, R.deletions||{}]) for(const id in m) tomb[id]=Math.max(tomb[id]||0, m[id]||0);
+  const alive=(id,upd)=> !(tomb[id] && tomb[id] >= (upd||0));
+  // tasks (updatedAt 최신 우선)
+  const tById={};
+  (L.tasks||[]).forEach(t=>{ tById[t.id]=t; });
+  (R.tasks||[]).forEach(t=>{ const e=tById[t.id]; if(!e||(t.updatedAt||0)>(e.updatedAt||0)) tById[t.id]=t; });
+  const tasks=Object.values(tById).filter(t=>alive(t.id,t.updatedAt));
+  // sessions (합집합)
+  const sById={}; (L.sessions||[]).forEach(s=>sById[s.id]=s); (R.sessions||[]).forEach(s=>sById[s.id]=s);
+  const sessions=Object.values(sById).filter(s=> !tomb[s.id]);
+  // projects/events (합집합, newer가 충돌 우선 → older 먼저 채우고 newer로 덮음)
+  const union=(key)=>{ const m={}; (older[key]||[]).forEach(x=>m[x.id]=x); (newer[key]||[]).forEach(x=>m[x.id]=x); return Object.values(m).filter(x=> !tomb[x.id]); };
+  return {
+    tasks, sessions,
+    projects: union('projects'),
+    events: union('events'),
+    settings: newer.settings || L.settings || R.settings || {},
+    top3: newer.top3 || {},
+    weekNotes: newer.weekNotes || {},
+    holidays: newer.holidays || [],
+    deletions: tomb,
+    updatedAt: Math.max(L.updatedAt||0, R.updatedAt||0)
+  };
+}

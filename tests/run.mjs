@@ -400,6 +400,34 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('재클릭해도 중복 없음', hs2.length === hs.length);
 }
 
+// ───────────────────────── 15) 동기화 병합 (mergeStates) ─────────────────────────
+{
+  section('동기화 병합');
+  const { window: w, getErr } = boot(baseState());
+  const M = w.mergeStates;
+  ck('런타임 에러 없음', !getErr());
+  ck('mergeStates 전역 노출', typeof M === 'function');
+  let m = M({ tasks: [{ id: 'L', title: '로컬', updatedAt: 5 }], updatedAt: 10 },
+            { tasks: [{ id: 'R', title: '원격', updatedAt: 5 }], updatedAt: 20 });
+  ck('양쪽 고유 태스크 보존', m.tasks.some(t => t.id === 'L') && m.tasks.some(t => t.id === 'R'));
+  m = M({ tasks: [{ id: 'X', title: '로컬최신', updatedAt: 100 }], updatedAt: 100 },
+        { tasks: [{ id: 'X', title: '원격구', updatedAt: 50 }], updatedAt: 200 });
+  ck('충돌 시 updatedAt 최신 우선', m.tasks.find(t => t.id === 'X').title === '로컬최신');
+  m = M({ tasks: [], deletions: { D: 100 }, updatedAt: 100 },
+        { tasks: [{ id: 'D', updatedAt: 50 }], updatedAt: 200 });
+  ck('tombstone로 삭제 보존', !m.tasks.some(t => t.id === 'D'));
+  m = M({ tasks: [], deletions: { D: 100 }, updatedAt: 100 },
+        { tasks: [{ id: 'D', title: '삭제후편집', updatedAt: 150 }], updatedAt: 200 });
+  ck('삭제보다 최신 편집은 유지(부활)', m.tasks.some(t => t.id === 'D'));
+  m = M({ sessions: [{ id: 's1' }], updatedAt: 10 }, { sessions: [{ id: 's2' }], updatedAt: 20 });
+  ck('sessions 합집합', m.sessions.length === 2);
+  m = M({ projects: [{ id: 'p1' }], updatedAt: 10 }, { projects: [{ id: 'p2' }], updatedAt: 20 });
+  ck('projects 합집합', m.projects.length === 2);
+  m = M({ settings: { focus: 99 }, updatedAt: 10 }, { settings: { focus: 25 }, updatedAt: 20 });
+  ck('settings는 최신(원격) 채택', m.settings.focus === 25);
+  ck('deletions 합집합 유지', M({ deletions: { a: 1 }, updatedAt: 1 }, { deletions: { b: 2 }, updatedAt: 2 }).deletions.a === 1);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
