@@ -448,6 +448,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   for (let i = 0; i < 3; i++) $('#cal-next').click();
   const hasChuseok = $$('.mo-hol').some(e => e.textContent.includes('추석'));
   ck('월간에 공휴일 이름(추석) 표시', hasChuseok);
+  // 대체공휴일도 날짜 글씨 빨강(d-sun) — state.holidays에 없어도 테이블 기준 (3월로 이동)
+  for (let i = 0; i < 6; i++) $('#cal-prev').click(); // 9월 → 3월
+  const subCell = $$('.mo-cell').find(c => { const h = c.querySelector('.mo-hol'); return h && h.textContent.includes('대체공휴일'); });
+  ck('대체공휴일 셀 존재', !!subCell);
+  ck('대체공휴일 날짜 빨강(d-sun)', subCell && subCell.classList.contains('d-sun'));
 }
 
 // ───────────────────────── 결과 ─────────────────────────

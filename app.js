@@ -416,7 +416,7 @@
   }
   function dayColorClass(ds){
     const dow=new Date(ds+'T00:00:00').getDay();
-    if(isHoliday(ds)||dow===0) return 'd-sun';
+    if(holidayName(ds)||dow===0) return 'd-sun'; // 공휴일(대체공휴일 포함)·일요일 = 빨강. 이름과 동일 출처
     if(dow===6) return 'd-sat';
     return '';
   }
