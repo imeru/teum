@@ -407,6 +407,20 @@
     renderCalBody();
   }
 
+  // 요일·공휴일 색상/이름 (일·공휴일=빨강, 토=파랑)
+  function isHoliday(ds){ return (state.holidays||[]).includes(ds); }
+  function holidayName(ds){
+    if(KR_HOLIDAY_NAMES[ds]) return KR_HOLIDAY_NAMES[ds];   // 정확 날짜(실제 공휴일)
+    if(!isHoliday(ds)) return null;                          // 등록된 휴일이 아니면 이름 없음
+    return KR_HOLIDAY_NAMES[ds.slice(5)] || '휴일';          // 사용자 추가 휴일
+  }
+  function dayColorClass(ds){
+    const dow=new Date(ds+'T00:00:00').getDay();
+    if(isHoliday(ds)||dow===0) return 'd-sun';
+    if(dow===6) return 'd-sat';
+    return '';
+  }
+
   // ---- 캘린더 상단: 네비 + 일/주/월 토글 ----
   function calRangeLabel(){
     const d=parseDS(planDate);
@@ -422,7 +436,7 @@
       <button class="iconbtn cal-arrow" id="cal-prev" title="이전">‹</button>
       <button class="btn sm" id="cal-today">오늘</button>
       <button class="iconbtn cal-arrow" id="cal-next" title="다음">›</button>
-      <span class="cal-range">${esc(calRangeLabel())}</span>
+      <span class="cal-range ${planView==='day'?dayColorClass(planDate):''}">${esc(calRangeLabel())}${planView==='day'&&holidayName(planDate)?` · ${esc(holidayName(planDate))}`:''}</span>
       <div class="seg" role="tablist">
         <button data-v="day" class="${planView==='day'?'on':''}">일간</button>
         <button data-v="week" class="${planView==='week'?'on':''}">주간</button>
@@ -508,7 +522,8 @@
           times=wk.querySelector('.wk-times'), cols=wk.querySelector('.wk-cols');
     // 요일 헤더
     days.forEach(ds=>{ const d=parseDS(ds);
-      const h=el(`<div class="wk-dh ${ds===today?'today':''} ${ds===planDate?'sel':''}"><span class="dow">${DOW[d.getDay()]}</span><span class="dom">${d.getDate()}</span></div>`);
+      const hn=holidayName(ds);
+      const h=el(`<div class="wk-dh ${dayColorClass(ds)} ${ds===today?'today':''} ${ds===planDate?'sel':''}" ${hn?`title="${esc(hn)}"`:''}><span class="dow">${DOW[d.getDay()]}</span><span class="dom">${d.getDate()}</span>${hn?`<span class="wk-hol">${esc(hn)}</span>`:''}</div>`);
       h.onclick=()=>{ planDate=ds; setPlanView('day'); };
       heads.appendChild(h);
     });
@@ -589,8 +604,9 @@
       const row=week.querySelector('.mo-row'), bHost=week.querySelector('.mo-banners');
       wdays.forEach(ds=>{
         const d=parseDS(ds); const out=d.getMonth()!==mo;
-        const cell=el(`<div class="mo-cell ${out?'out':''} ${ds===today?'today':''} ${ds===planDate?'sel':''}" style="padding-top:${padTop}px">
-          <div class="mo-d">${d.getDate()}</div><div class="mo-items"></div></div>`);
+        const hn=holidayName(ds);
+        const cell=el(`<div class="mo-cell ${dayColorClass(ds)} ${out?'out':''} ${ds===today?'today':''} ${ds===planDate?'sel':''}" style="padding-top:${padTop}px">
+          <div class="mo-d">${d.getDate()}</div>${hn?`<div class="mo-hol" title="${esc(hn)}">${esc(hn)}</div>`:''}<div class="mo-items"></div></div>`);
         const host=cell.querySelector('.mo-items');
         // 시간 있는 일반 일정(단발)만 칩으로 (종일·기간은 배너로 표시됨)
         const timedOnce=(state.events||[]).filter(ev=>ev.freq==='once'&&!ev.allDay&&eventOccursOn(ev,ds));
@@ -979,8 +995,9 @@
     for(let i=0;i<startDow;i++) html+=`<div></div>`;
     for(let d=1;d<=days;d++){
       const ds=todayStr(new Date(y,m,d));
-      const cls=['mc-day']; if(ds===planDate)cls.push('sel'); if(ds===todayStr())cls.push('today');
-      html+=`<div class="${cls.join(' ')}" data-ds="${ds}">${d}${hasItems(ds)?'<span class="mc-dot"></span>':''}</div>`;
+      const cls=['mc-day']; const dc=dayColorClass(ds); if(dc)cls.push(dc); if(ds===planDate)cls.push('sel'); if(ds===todayStr())cls.push('today');
+      const hn=holidayName(ds);
+      html+=`<div class="${cls.join(' ')}" data-ds="${ds}" ${hn?`title="${esc(hn)}"`:''}>${d}${hasItems(ds)?'<span class="mc-dot"></span>':''}</div>`;
     }
     html+=`</div>`;
     host.innerHTML=html;

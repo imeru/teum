@@ -428,6 +428,28 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('deletions 합집합 유지', M({ deletions: { a: 1 }, updatedAt: 1 }, { deletions: { b: 2 }, updatedAt: 2 }).deletions.a === 1);
 }
 
+// ───────────────────────── 16) 요일·공휴일 색상 + 이름 (월간) ─────────────────────────
+{
+  section('요일·공휴일 색상');
+  // 2026년이면 공휴일 테이블이 있어 이름 표시 검증 가능
+  const { $, $$, getErr } = boot(baseState({ holidays: ['2026-09-25'] }), { planview: 'month', lastview: 'plan' });
+  $('.nav[data-view="plan"]').click();
+  // planDate를 2026-09로 이동해야 추석이 보임 → 미니달력 대신 9월로 nav (월간 기준 현재월). today가 6월이므로 9월로 3번 다음
+  $$('.seg button').find(b => b.dataset.v === 'month').click();
+  ck('런타임 에러 없음', !getErr());
+  // 일요일 dow 헤더는 sun 색 클래스
+  ck('월간 일요일 헤더 sun', $$('.mo-dn')[0].classList.contains('sun'));
+  ck('월간 토요일 헤더 sat', $$('.mo-dn')[6].classList.contains('sat'));
+  // 토요일 셀은 d-sat, 일요일/공휴일 셀은 d-sun
+  const satCells = $$('.mo-cell.d-sat'), sunCells = $$('.mo-cell.d-sun');
+  ck('토요일 셀 d-sat 존재', satCells.length >= 4);
+  ck('일/공휴일 셀 d-sun 존재', sunCells.length >= 4);
+  // 다음 달로 이동하여 9월 추석 이름 표시 확인 (today=2026-06 기준 3개월 뒤)
+  for (let i = 0; i < 3; i++) $('#cal-next').click();
+  const hasChuseok = $$('.mo-hol').some(e => e.textContent.includes('추석'));
+  ck('월간에 공휴일 이름(추석) 표시', hasChuseok);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

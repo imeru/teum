@@ -5,6 +5,7 @@
   --text:#16242f; --muted:#7e8a90; --accent:#16324a; --accent-soft:#e9edf0; --on-accent:#ffffff; --sage:#83bfa7;
   --p1:#c97a16; --p2:#b8924a; --p3:#5f93a6; --p4:#aeb6b6;
   --green:#4f9b76; --red:#d2483f; --amber:#c98a1a;
+  --sun:#c4524a; --sat:#3f6fa3;  /* 일·공휴일 / 토요일 (차분한 톤) */
   --shadow:0 1px 2px rgba(30,33,38,.04),0 6px 20px rgba(30,33,38,.05);
   --radius:14px;
 }
@@ -13,6 +14,7 @@
     --text:#e9eae6; --muted:#969a96; --accent:#8fa6bf; --accent-soft:#262b34; --on-accent:#15161a; --sage:#9cc0a8;
     --p1:#d59446; --p2:#c2a060; --p3:#8fa3b8; --p4:#5d5e66;
     --green:#5fae82; --red:#e15a52; --amber:#d6a13a;
+    --sun:#e0726a; --sat:#7aa3d6;
     --shadow:0 1px 2px rgba(0,0,0,.2),0 6px 20px rgba(0,0,0,.25); }
 }
 *{box-sizing:border-box}
@@ -223,7 +225,7 @@ input,textarea,select{font-family:inherit}
 .mo{display:flex;flex-direction:column;flex:1;min-height:0;background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
 .mo-dow{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)}
 .mo-dn{text-align:center;font-size:11px;color:var(--muted);padding:6px 0;font-weight:600}
-.mo-dn.sun{color:var(--red)} .mo-dn.sat{color:var(--accent)}
+.mo-dn.sun{color:var(--sun)} .mo-dn.sat{color:var(--sat)}
 .mo-weeks{flex:1;min-height:0;display:flex;flex-direction:column}
 .mo-week{flex:1;min-height:0;position:relative;display:flex}
 .mo-row{flex:1;display:grid;grid-template-columns:repeat(7,1fr);min-height:0}
@@ -248,6 +250,16 @@ input,textarea,select{font-family:inherit}
 .mc-day.sel{background:var(--accent);color:var(--on-accent)}
 .mc-dot{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)}
 .mc-day.sel .mc-dot{background:#fff}
+/* 요일·공휴일 색상 (일·공휴일=빨강, 토=파랑) + 공휴일 이름 */
+.cal-range.d-sun{color:var(--sun)} .cal-range.d-sat{color:var(--sat)}
+.wk-dh.d-sun:not(.today) .dom,.wk-dh.d-sun:not(.today) .dow{color:var(--sun)}
+.wk-dh.d-sat:not(.today) .dom,.wk-dh.d-sat:not(.today) .dow{color:var(--sat)}
+.wk-hol{display:block;font-size:9px;line-height:1.1;margin-top:1px;color:var(--sun);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px}
+.mc-day.d-sun:not(.sel):not(.today){color:var(--sun)}
+.mc-day.d-sat:not(.sel):not(.today){color:var(--sat)}
+.mo-cell.d-sun:not(.today) .mo-d{color:var(--sun)}
+.mo-cell.d-sat:not(.today) .mo-d{color:var(--sat)}
+.mo-hol{position:absolute;top:4px;right:5px;max-width:62%;font-size:9px;line-height:1.2;color:var(--sun);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
 
 /* Recurring event list + picker */
 .event-row{display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--border)}
