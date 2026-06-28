@@ -677,6 +677,24 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   let st5 = JSON.parse(localStorage.getItem('flowdo.state.v1'));
   ck('폴더 삭제', st5.folders.length === 0);
   ck('폴더 삭제 → 메모 folderId 비움', st5.memos.filter(m => m.folderId === fid).length === 0);
+  // 드래그 앤 드롭으로 폴더 이동
+  $('.memo-folder[data-fid="all"]').click();
+  const dcard = $$('.memo-card')[0]; const did = dcard.dataset.id;
+  ck('카드 draggable 속성', dcard.getAttribute('draggable') === 'true');
+  dcard.dispatchEvent(new window.Event('dragstart'));
+  $('.memo-folder.trash').dispatchEvent(new window.Event('drop'));
+  ck('드롭(휴지통) → trashedAt 설정', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === did).trashedAt > 0);
+  // 복원 후 새 폴더로 드롭 이동
+  $('.memo-folder.trash').click();
+  $$('.memo-card').find(c => c.dataset.id === did).querySelector('[data-act="restore"]').click();
+  $('.memo-folder[data-fid="all"]').click();
+  $('#memoAddFolder').click();
+  const fid2 = JSON.parse(localStorage.getItem('flowdo.state.v1')).folders[0].id;
+  $('.memo-folder[data-fid="all"]').click();
+  const dcard2 = $$('.memo-card').find(c => c.dataset.id === did);
+  dcard2.dispatchEvent(new window.Event('dragstart'));
+  $(`.memo-folder[data-fid="${fid2}"]`).dispatchEvent(new window.Event('drop'));
+  ck('드롭(폴더) → folderId 이동', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === did).folderId === fid2);
   // mergeStates: memos 병합 (tasks와 동일 규칙)
   const M = window.mergeStates;
   let mg = M({ memos: [{ id: 'ML', title: '로컬메모', updatedAt: 5 }], updatedAt: 10 },

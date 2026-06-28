@@ -21,6 +21,7 @@
   let editingId = null;
   let editingMemoId = null; // 메모 편집 중인 id (없으면 목록 보기)
   let memoFolderId = 'all'; // 메모 뷰에서 선택된 폴더: 'all' | 'trash' | folderId
+  let memoDragId = null;    // 드래그 중인 메모 id (폴더로 끌어 이동)
   let selectedPrio = 4;
   let projColor = PROJECT_COLORS[0];
   let supa = null;          // supabase client
@@ -247,6 +248,14 @@
     const chip=(id,label,count,extra='')=>{
       const b=el(`<button class="memo-folder ${memoFolderId===id?'sel':''} ${extra}" data-fid="${id}">${esc(label)}<span class="mf-count">${count||''}</span></button>`);
       b.onclick=()=>{ memoFolderId=id; render(); };
+      // 메모 카드를 끌어다 놓는 드롭 타깃
+      b.addEventListener('dragover',e=>{ if(memoDragId!=null){ e.preventDefault(); e.dataTransfer.dropEffect='move'; b.classList.add('drop'); } });
+      b.addEventListener('dragleave',()=>b.classList.remove('drop'));
+      b.addEventListener('drop',e=>{
+        e.preventDefault(); b.classList.remove('drop');
+        const mid=memoDragId||(e.dataTransfer&&e.dataTransfer.getData('text/plain')); if(!mid) return;
+        if(id==='trash') delMemo(mid); else moveMemo(mid, id==='all'?'':id);
+      });
       return b;
     };
     bar.appendChild(chip('all','전체',countFor('all')));
@@ -294,6 +303,11 @@
     </div>`);
     if(m.color) card.style.borderLeft=`3px solid ${m.color}`;
     card.querySelector('.memo-card-body').onclick=()=>{ editingMemoId=m.id; render(); };
+    if(!inTrash){
+      card.setAttribute('draggable','true');
+      card.addEventListener('dragstart',e=>{ memoDragId=m.id; try{ e.dataTransfer.setData('text/plain',m.id); e.dataTransfer.effectAllowed='move'; }catch(_){}; card.classList.add('dragging'); });
+      card.addEventListener('dragend',()=>{ memoDragId=null; card.classList.remove('dragging'); document.querySelectorAll('.memo-folder.drop').forEach(x=>x.classList.remove('drop')); });
+    }
     const acts=card.querySelector('.memo-actions');
     if(inTrash){
       const r=el(`<button class="iconbtn" data-act="restore" title="복원">복원</button>`);

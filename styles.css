@@ -129,6 +129,9 @@ input,textarea,select{font-family:inherit}
 .memo-folder.sel .mf-count{color:var(--on-accent);opacity:.85}
 .memo-folder.add{border-style:dashed;color:var(--muted)}
 .memo-folder.trash{margin-left:auto}
+.memo-folder.drop{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);outline:2px dashed var(--accent);outline-offset:1px}
+.memo-card[draggable="true"]{cursor:grab}
+.memo-card.dragging{opacity:.45;cursor:grabbing}
 .memo-actionsbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
 .memo-card.pinned{border-color:var(--accent)}
 .mf-pin{display:inline-block;font-size:10.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:1px}
