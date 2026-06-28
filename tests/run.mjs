@@ -495,6 +495,48 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('장식 칩 아이콘 aria-hidden', $$('.chip svg[aria-hidden="true"]').length >= 1);
 }
 
+// ───────────────────────── 19) 순수 로직 유닛 (DOM 비의존, 견고) ─────────────────────────
+{
+  section('순수 로직 유닛');
+  const w = boot(baseState()).window;
+  // 날짜/시간 헬퍼
+  ck('pad', w.pad(3) === '03');
+  ck('minToHHMM', w.minToHHMM(90) === '01:30');
+  ck('hhmmToMin 왕복', w.hhmmToMin(w.minToHHMM(615)) === 615);
+  ck('addDaysDS 월경계', w.addDaysDS('2026-06-28', 3) === '2026-07-01');
+  ck('startOfWeekDS(일요일)', w.startOfWeekDS('2026-06-28') === '2026-06-28');
+  ck('isOverdue 과거=true', w.isOverdue('2020-01-01') === true);
+  ck('isOverdue 오늘=false', w.isOverdue(w.todayStr()) === false);
+  ck('fmtDue 오늘', w.fmtDue(w.todayStr()) === '오늘');
+  ck('isDone', w.isDone({ status: 'done' }) === true && w.isDone({ status: 'next' }) === false);
+  // 월 n번째 요일 / 월간 발생일
+  const fs1 = w.nthWeekday(2026, 2, 0, 1); // 2026 3월 첫 일요일 = 3/1(일)
+  ck('nthWeekday 첫 일요일=3/1', fs1 && fs1.getDate() === 1 && fs1.getDay() === 0);
+  const mo = w.monthlyOccDate({ monthMode: 'date', startDate: '2026-01-15' }, 2026, 5); // 6월
+  ck('monthlyOccDate 매월 15일', mo && mo.getDate() === 15 && mo.getMonth() === 5);
+  // 추천 점수
+  ck('prioScore P1=1', w.prioScore({ priority: 1 }) === 1);
+  ck('fitScore 비율', w.fitScore({ estimate: 30 }, 60) === 0.5);
+  ck('fitScore 미입력=0.45', w.fitScore({}, 60) === 0.45);
+  ck('daysUntil null', w.daysUntil(null) === null);
+  ck('suggestScore 지난마감 사유', w.suggestScore({ priority: 4, due: '2020-01-01' }, 30).reason === '지난 마감');
+  // 일정 설명
+  ck('describeEvent 주간', /매주/.test(w.describeEvent({ freq: 'weekly', interval: 1, days: [1, 3], start: 540, duration: 60 })));
+  ck('describeEvent 매월 날짜', /매월/.test(w.describeEvent({ freq: 'monthly', monthMode: 'date', startDate: '2026-06-10', interval: 1, start: 600, duration: 30 })));
+  ck('describeEvent 종일', /종일/.test(w.describeEvent({ freq: 'once', allDay: true, startDate: '2026-07-01', endDate: '2026-07-03' })));
+  ck('isPastEvent 과거 once', w.isPastEvent({ freq: 'once', startDate: '2020-01-01', endDate: '2020-01-02' }) === true);
+  ck('isPastEvent 미래 once', w.isPastEvent({ freq: 'once', startDate: '2099-01-01', endDate: '2099-01-02' }) === false);
+  // 정렬: 완료는 뒤, 지남/우선순위 우선
+  const sorted = w.sortTasks([
+    { id: 'done', status: 'done', priority: 1, completedAt: 5 },
+    { id: 'p4', status: 'next', priority: 4, due: null, createdAt: 2 },
+    { id: 'over', status: 'next', priority: 4, due: '2020-01-01', createdAt: 1 },
+    { id: 'p1', status: 'next', priority: 1, due: null, createdAt: 3 },
+  ]);
+  ck('sortTasks: 완료 맨 뒤', sorted[sorted.length - 1].id === 'done');
+  ck('sortTasks: 지난 항목 최상위', sorted[0].id === 'over');
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
