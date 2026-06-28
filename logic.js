@@ -102,14 +102,17 @@ function mergeStates(local, remote){
   const sessions=Object.values(sById).filter(s=> !tomb[s.id]);
   // projects/events (합집합, newer가 충돌 우선 → older 먼저 채우고 newer로 덮음)
   const union=(key)=>{ const m={}; (older[key]||[]).forEach(x=>m[x.id]=x); (newer[key]||[]).forEach(x=>m[x.id]=x); return Object.values(m).filter(x=> !tomb[x.id]); };
+  // settings/top3/weekNotes는 키별 얕은 병합(양쪽 변경 보존, 충돌 시 newer 우선),
+  // holidays는 합집합 — 기존엔 'newer 통째로'라 한쪽 변경이 유실되던 비대칭 버그 수정.
+  const mergeMap=(key)=>Object.assign({}, older[key]||{}, newer[key]||{});
   return {
     tasks, sessions,
     projects: union('projects'),
     events: union('events'),
-    settings: newer.settings || L.settings || R.settings || {},
-    top3: newer.top3 || {},
-    weekNotes: newer.weekNotes || {},
-    holidays: newer.holidays || [],
+    settings: mergeMap('settings'),
+    top3: mergeMap('top3'),
+    weekNotes: mergeMap('weekNotes'),
+    holidays: [...new Set([...(L.holidays||[]), ...(R.holidays||[])])],
     deletions: tomb,
     updatedAt: Math.max(L.updatedAt||0, R.updatedAt||0)
   };

@@ -535,6 +535,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ]);
   ck('sortTasks: 완료 맨 뒤', sorted[sorted.length - 1].id === 'done');
   ck('sortTasks: 지난 항목 최상위', sorted[0].id === 'over');
+  // mergeStates: settings/top3/holidays 키별 병합 — 한쪽 변경 유실 방지(가재코드 합의 검증 버그)
+  const mLocal = { settings:{focus:99,short:9,long:15,longEvery:4}, top3:{'2026-06-01':['a']}, holidays:['2026-01-01'], weekNotes:{}, updatedAt: 10 };
+  const mRemote = { settings:{focus:25,long:15,longEvery:4}, top3:{'2026-06-02':['b']}, holidays:['2026-03-01'], weekNotes:{}, updatedAt: 20 };
+  const merged = w.mergeStates(mLocal, mRemote);
+  ck('merge settings: newer 필드 우선(focus=25)', merged.settings.focus === 25);
+  ck('merge settings: newer에 없는 older 필드 보존(short=9)', merged.settings.short === 9);
+  ck('merge top3: 양쪽 날짜 보존', merged.top3['2026-06-01'] && merged.top3['2026-06-02']);
+  ck('merge holidays: 합집합', merged.holidays.includes('2026-01-01') && merged.holidays.includes('2026-03-01'));
 }
 
 // ───────────────────────── 결과 ─────────────────────────

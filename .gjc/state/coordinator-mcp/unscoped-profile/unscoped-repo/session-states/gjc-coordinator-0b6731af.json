@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "session_id": "gjc-coordinator-0b6731af",
+  "state": "running",
+  "ready_for_input": false,
+  "updated_at": "2026-06-28T16:53:15.887Z",
+  "current_turn_id": "turn-d22c3ed0-18c8-408e-9f6a-68d01c35e20a",
+  "last_turn_id": null,
+  "live": true,
+  "reason": null,
+  "source": "agent_session_event",
+  "event": "turn_start",
+  "cwd": "/Users/hyunwoolim/Documents/dev/teum.gajae-code-worktrees/main-0d6e4079",
+  "session_file": "/Users/hyunwoolim/.gjc/agent/sessions/-Documents-dev-teum.gajae-code-worktrees-main-0d6e4079/2026-06-28T16-35-03-006Z_019f0f15-9ede-7000-9d07-e67ecc4d0ce9/4-RalplanCritic2.jsonl"
+}

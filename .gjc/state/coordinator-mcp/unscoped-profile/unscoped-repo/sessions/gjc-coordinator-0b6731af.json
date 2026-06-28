@@ -1,0 +1,13 @@
+{
+  "session_id": "gjc-coordinator-0b6731af",
+  "tmux_session": "gjc-coordinator-0b6731af",
+  "cwd": "/Users/hyunwoolim/Documents/dev/teum",
+  "created_at": "2026-06-28T16:35:02.408Z",
+  "sessionId": "gjc-coordinator-0b6731af",
+  "tmuxSession": "gjc-coordinator-0b6731af",
+  "tmuxTarget": "gjc-coordinator-0b6731af:0.0",
+  "paneId": "%0",
+  "createdAt": "2026-06-28T16:35:02.408Z",
+  "sessionCommand": "gjc --worktree --model opus",
+  "runtimeStateFile": "/Users/hyunwoolim/Documents/dev/teum/.gjc/state/coordinator-mcp/unscoped-profile/unscoped-repo/session-states/gjc-coordinator-0b6731af.json"
+}

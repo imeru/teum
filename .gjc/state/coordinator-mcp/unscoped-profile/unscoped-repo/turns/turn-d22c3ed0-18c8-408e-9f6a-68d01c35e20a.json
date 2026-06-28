@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "turn_id": "turn-d22c3ed0-18c8-408e-9f6a-68d01c35e20a",
+  "session_id": "gjc-coordinator-0b6731af",
+  "namespace": {
+    "profile": null,
+    "repo": null
+  },
+  "status": "active",
+  "prompt": {
+    "text": "/skill:ralplan\n\nDelegated by coordinator MCP tool: gjc_delegate_plan\nWorkflow: plan\nCWD: /Users/hyunwoolim/Documents/dev/teum\nMutation intent: mutation requested; coordinator startup policy remains authoritative.\nOptional model hint: none\n\nTask:\n틈(TEUM) 앱의 다음 개선 작업을 진단하고 합의 기반으로 계획해줘. 코드 변경 금지, 진단·계획만.\n\n## 프로젝트(무빌드 바닐라 JS PWA, GitHub Pages 배포)\n- 파일: index.html, styles.css, app.js(IIFE ~1900줄), constants.js/helpers.js/logic.js(전역공유 순수 상수·헬퍼·로직), supabase.js(UMD 번들), service-worker.js, privacy.html, tests/run.mjs(jsdom 155개).\n- 최근 완료: CI(GitHub Actions), 접근성 패스, 순수 유닛테스트 확대, renderSettings 카드 분할, CSP meta, 개인정보처리방침/수집동의, 한국 공휴일·요일색, 동기화 항목별 병합+tombstone, Supabase 로컬 번들.\n\n## 강한 제약(반드시 준수)\n- 무빌드·ES 모듈 금지(eval 기반 테스트 하니스가 깨짐). 전역공유 클래식 스크립트만.\n- 기능마다: 헤드리스 테스트 추가 + npm test 통과 + service-worker CACHE bump + 커밋.\n- docs/ 설계 원칙(차분·미니멀·시간우선, 색은 의미 전달만, 모바일 우선, build less).\n- localStorage 키·Supabase 테이블명(flowdo)은 데이터 호환 위해 유지.\n\n## 산출물\n1. 남은 기술부채·위험 진단(app.js 단일 대형 파일, 전체 재렌더 성능, 테스트 DOM 의존, 동기화 충돌/오프라인, 접근성 잔여 갭).\n2. 향후 유지관리·효율·품질 향상 작업의 우선순위(가치/위험/노력). 무빌드·테스트호환 안만.\n3. 최상위 1~2개의 구체 실행 계획(파일·접근·테스트 전략).\n\nReturn durable status and artifact references through GJC runtime/coordinator state. Do not expose host-facing tmux controls.",
+    "created_at": "2026-06-28T16:35:02.414Z",
+    "source": "mcp"
+  },
+  "delivery": {
+    "delivered": false,
+    "queued": false,
+    "target": "gjc-coordinator-0b6731af:0.0",
+    "tmux_keys_sent": true,
+    "prompt_acknowledged": false,
+    "state": "tmux_keys_sent",
+    "attempts": [
+      {
+        "delivered": false,
+        "tmux_keys_sent": true,
+        "channel": "tmux_keys",
+        "created_at": "2026-06-28T16:35:02.425Z",
+        "reason": "awaiting_runtime_ack"
+      }
+    ]
+  },
+  "question_ids": [],
+  "final_response": {
+    "text": null,
+    "format": "markdown",
+    "source": null,
+    "artifact_path": null,
+    "truncated": false
+  },
+  "evidence": [],
+  "error": null,
+  "liveness": {
+    "checked_at": "2026-06-28T16:35:02.415Z",
+    "live": true,
+    "reason": null
+  },
+  "created_at": "2026-06-28T16:35:02.414Z",
+  "updated_at": "2026-06-28T16:35:02.425Z",
+  "started_at": "2026-06-28T16:35:02.414Z",
+  "completed_at": null
+}
