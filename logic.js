@@ -79,6 +79,15 @@ function installInstructions(){
   return '브라우저 주소창 오른쪽의 설치 아이콘(⊕/모니터 모양)을 누르거나, 메뉴에서 "앱 설치"를 선택하세요.';
 }
 
+// ---- 타임박스 좌표 수학(순수) — 상수는 인자로 받아 IIFE 의존 제거, 단위 테스트 가능 ----
+function tbSnap(m, snap){ return Math.round(m / snap) * snap; }
+function tbMinToTop(min, calStart, pxPerMin){ return (min - calStart * 60) * pxPerMin; }
+function tbClampMin(min, calStart, calEnd, snap){ return Math.max(calStart * 60, Math.min(calEnd * 60 - snap, min)); }
+// 그리드 상단 기준 y(px) → 스냅·클램프된 분
+function tbYToMin(yPx, calStart, calEnd, snap, pxPerMin, offsetMin){
+  return tbClampMin(tbSnap(calStart * 60 + yPx / pxPerMin - (offsetMin || 0), snap), calStart, calEnd, snap);
+}
+
 // 동기화 병합(순수): 로컬+원격을 항목 단위로 합쳐 기기 간 데이터 손실 방지.
 //  - tasks: id별 updatedAt 최신 우선
 //  - sessions: id 합집합(추가형 로그)

@@ -577,8 +577,7 @@
       col.addEventListener('dragover',e=>{e.preventDefault();});
       col.addEventListener('drop',e=>{e.preventDefault();const id=e.dataTransfer.getData('text/plain');if(!id)return;
         const r=col.getBoundingClientRect();
-        let m=snapMin(CAL_START*60+(e.clientY-r.top)/PX_PER_MIN-dragOffsetMin);
-        m=Math.max(CAL_START*60,Math.min(CAL_END*60-SNAP_MIN,m));
+        const m=tbYToMin(e.clientY-r.top, CAL_START, CAL_END, SNAP_MIN, PX_PER_MIN, dragOffsetMin);
         scheduleTask(id,m,ds);
       });
       cols.appendChild(col);
@@ -734,12 +733,12 @@
   }
 
   // -- Day calendar (10분 단위 · 자유 드래그 이동 · 길이 조절 · 정기 일정 표시) --
-  let CAL_START=8;                          // 일간: 기본 08시 시작(가변), 주간: 6시
-  const CAL_END=24, SNAP_MIN=10, PX_PER_MIN=1; // 1분=1px, 10분 단위 스냅
+  let CAL_START=8;                          // 일간: 기본 08시 시작(가변), 주간: 6시 (CAL_END/SNAP_MIN/PX_PER_MIN은 constants.js)
   let dayExpanded=false;                     // 일간에서 새벽(00–08시) 펼침 여부
   let dragOffsetMin=0, resizing=false;
-  function minToTop(min){ return (min-CAL_START*60)*PX_PER_MIN; }
-  function snapMin(m){ return Math.round(m/SNAP_MIN)*SNAP_MIN; }
+  // 순수 수학은 logic.js(tb*)로 분리, 아래는 현재 상수를 넘기는 얇은 래퍼
+  function minToTop(min){ return tbMinToTop(min, CAL_START, PX_PER_MIN); }
+  function snapMin(m){ return tbSnap(m, SNAP_MIN); }
   function weekdayOf(ds){ return new Date(ds+'T00:00:00').getDay(); }
 
   function renderCalendar(){
@@ -787,8 +786,7 @@
   }
   function calMin(e){
     const grid=$('#calGrid'); const rect=grid.getBoundingClientRect();
-    let m=snapMin(CAL_START*60 + (e.clientY-rect.top)/PX_PER_MIN - dragOffsetMin);
-    return Math.max(CAL_START*60, Math.min(CAL_END*60-SNAP_MIN, m));
+    return tbYToMin(e.clientY-rect.top, CAL_START, CAL_END, SNAP_MIN, PX_PER_MIN, dragOffsetMin);
   }
   function showDropIndic(e){
     const grid=$('#calGrid'); if(!grid) return;

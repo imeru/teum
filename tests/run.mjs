@@ -543,6 +543,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('merge settings: newer에 없는 older 필드 보존(short=9)', merged.settings.short === 9);
   ck('merge top3: 양쪽 날짜 보존', merged.top3['2026-06-01'] && merged.top3['2026-06-02']);
   ck('merge holidays: 합집합', merged.holidays.includes('2026-01-01') && merged.holidays.includes('2026-03-01'));
+  // 타임박스 좌표 수학(순수, 파라미터화)
+  ck('tbSnap 10분 스냅', w.tbSnap(67, 10) === 70);
+  ck('tbMinToTop(09:00, start08)', w.tbMinToTop(540, 8, 1) === 60);
+  ck('tbClampMin 상한', w.tbClampMin(2000, 8, 24, 10) === 1430);
+  ck('tbClampMin 하한', w.tbClampMin(100, 8, 24, 10) === 480);
+  ck('tbYToMin 변환+스냅+클램프', w.tbYToMin(67, 8, 24, 10, 1, 0) === 550);
 }
 
 // ───────────────────────── 결과 ─────────────────────────

@@ -1,6 +1,8 @@
 /* 틈(TEUM) 공용 상수 — app.js보다 먼저 로드 (전역 스코프 공유, 무빌드) */
 const PROJECT_COLORS = ['#4f46e5','#16a34a','#e5484d','#f76808','#0091ff','#9333ea','#0d9488','#db2777'];
 const DOW = '일월화수목금토';
+// 타임박스 시간표 상수 (CAL_START는 뷰/펼침에 따라 바뀌므로 app.js의 가변 let으로 유지)
+const CAL_END = 24, SNAP_MIN = 10, PX_PER_MIN = 1; // 06~24시, 10분 스냅, 1분=1px
 
 // 한국 공휴일(대체공휴일·설·추석·부처님오신날 포함). 테이블에 없는 해는 양력 고정일로 폴백.
 const KR_HOLIDAYS = {
