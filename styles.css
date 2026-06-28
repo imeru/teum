@@ -134,9 +134,11 @@ input,textarea,select{font-family:inherit}
 .memo-card.dragging{opacity:.45;cursor:grabbing}
 .memo-actionsbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
 .memo-card.pinned{border-color:var(--accent)}
-.mf-pin{display:inline-block;font-size:10.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+.mf-pin{display:inline-flex;align-items:center;color:var(--accent);margin-right:5px;vertical-align:-2px}
+.mf-pin .ico-sm{width:13px;height:13px}
+.memo-folder .ico-sm{width:15px;height:15px;vertical-align:-3px}
 .memo-actions .iconbtn.on{color:var(--accent);background:var(--accent-soft)}
-.memo-actions .iconbtn[data-act="pin"],.memo-actions .iconbtn[data-act="restore"]{font-size:12px;padding:5px 8px;width:auto}
+.memo-actions .iconbtn[data-act="restore"]{font-size:12px;padding:5px 8px;width:auto}
 .memo-move{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;height:28px;max-width:96px;font-size:12px;outline:none;cursor:pointer}
 /* Quill 에디터 — 앱 테마에 맞춤(라이트/다크 공용) */
 .memo-quill-toolbar.ql-toolbar.ql-snow,.ql-toolbar.ql-snow{border-color:var(--border);background:var(--panel-2);border-radius:10px 10px 0 0}

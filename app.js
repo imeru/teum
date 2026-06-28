@@ -245,8 +245,8 @@
     const countFor=fid=> all.filter(m=>!m.trashedAt && (fid==='all'||m.folderId===fid)).length;
     // 폴더 바
     const bar=el('<div class="memo-folderbar"></div>');
-    const chip=(id,label,count,extra='')=>{
-      const b=el(`<button class="memo-folder ${memoFolderId===id?'sel':''} ${extra}" data-fid="${id}">${esc(label)}<span class="mf-count">${count||''}</span></button>`);
+    const chip=(id,label,count,extra='',icon='')=>{
+      const b=el(`<button class="memo-folder ${memoFolderId===id?'sel':''} ${extra}" data-fid="${id}" title="${esc(label)}">${icon||esc(label)}<span class="mf-count">${count||''}</span></button>`);
       b.onclick=()=>{ memoFolderId=id; render(); };
       // 메모 카드를 끌어다 놓는 드롭 타깃
       b.addEventListener('dragover',e=>{ if(memoDragId!=null){ e.preventDefault(); e.dataTransfer.dropEffect='move'; b.classList.add('drop'); } });
@@ -261,7 +261,7 @@
     bar.appendChild(chip('all','전체',countFor('all')));
     folders.forEach(f=>bar.appendChild(chip(f.id, f.name||'폴더', countFor(f.id))));
     const addF=el(`<button class="memo-folder add" id="memoAddFolder" title="폴더 추가">${cic('plus')} 폴더</button>`); addF.onclick=addFolder; bar.appendChild(addF);
-    bar.appendChild(chip('trash','휴지통',trashCount,'trash'));
+    bar.appendChild(chip('trash','휴지통',trashCount,'trash',svgIco('trash')));
     content.appendChild(bar);
     // 액션 줄
     const actions=el('<div class="memo-actionsbar"></div>');
@@ -296,7 +296,7 @@
     const pinned=m.pinned&&!inTrash;
     const card=el(`<div class="memo-card ${pinned?'pinned':''}" data-id="${m.id}">
       <div class="memo-card-body">
-        <div class="memo-title">${pinned?'<span class="mf-pin">고정</span>':''}${esc(memoDisplayTitle(m))}</div>
+        <div class="memo-title">${pinned?'<span class="mf-pin" title="상단 고정">'+svgIco('pin')+'</span>':''}${esc(memoDisplayTitle(m))}</div>
         ${body?`<div class="memo-preview">${esc(body)}</div>`:''}
       </div>
       <div class="memo-actions"></div>
@@ -316,7 +316,7 @@
       p.onclick=e=>{ e.stopPropagation(); purgeMemo(m.id); };
       acts.appendChild(r); acts.appendChild(p);
     } else {
-      const pin=el(`<button class="iconbtn ${m.pinned?'on':''}" data-act="pin" title="${m.pinned?'고정 해제':'상단 고정'}">${m.pinned?'고정됨':'고정'}</button>`);
+      const pin=el(`<button class="iconbtn ${m.pinned?'on':''}" data-act="pin" title="${m.pinned?'고정 해제':'상단 고정'}">${svgIco('pin')}</button>`);
       pin.onclick=e=>{ e.stopPropagation(); pinMemo(m.id); };
       const sel=el(`<select class="memo-move" data-act="move" title="폴더 이동"></select>`);
       sel.appendChild(el(`<option value="">폴더 없음</option>`));
