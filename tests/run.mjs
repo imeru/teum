@@ -716,6 +716,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   mg = M({ folders: [], deletions: { FD: 100 }, updatedAt: 100 },
          { folders: [{ id: 'FD', name: '삭제폴더', updatedAt: 50 }], updatedAt: 200 });
   ck('merge folders: tombstone 삭제 보존', !mg.folders.some(x => x.id === 'FD'));
+  // mergeStates: events/projects 항목별 병합 (다른 기기 일정 편집 손실 방지)
+  mg = M({ events: [{ id: 'EL', updatedAt: 5 }], updatedAt: 10 },
+         { events: [{ id: 'ER', updatedAt: 5 }], updatedAt: 20 });
+  ck('merge events: 양쪽 보존', mg.events.some(x => x.id === 'EL') && mg.events.some(x => x.id === 'ER'));
+  // 최상위 updatedAt은 원격이 크지만, 항목 updatedAt이 로컬이 최신 → 로컬 편집 유지(예전 union이면 유실)
+  mg = M({ events: [{ id: 'EX', title: '로컬최신', updatedAt: 100 }], updatedAt: 100 },
+         { events: [{ id: 'EX', title: '원격구', updatedAt: 50 }], updatedAt: 200 });
+  ck('merge events: 충돌 시 항목 updatedAt 최신 우선', mg.events.find(x => x.id === 'EX').title === '로컬최신');
+  mg = M({ events: [], deletions: { ED: 100 }, updatedAt: 100 },
+         { events: [{ id: 'ED', updatedAt: 50 }], updatedAt: 200 });
+  ck('merge events: tombstone 삭제 보존', !mg.events.some(x => x.id === 'ED'));
+  mg = M({ projects: [{ id: 'PX', name: '로컬', updatedAt: 100 }], updatedAt: 100 },
+         { projects: [{ id: 'PX', name: '원격', updatedAt: 50 }], updatedAt: 200 });
+  ck('merge projects: 충돌 시 항목 updatedAt 최신 우선', mg.projects.find(x => x.id === 'PX').name === '로컬');
 }
 
 // ───────────────────────── 결과 ─────────────────────────

@@ -119,15 +119,16 @@ function mergeStates(local, remote){
   // sessions (합집합)
   const sById={}; (L.sessions||[]).forEach(s=>sById[s.id]=s); (R.sessions||[]).forEach(s=>sById[s.id]=s);
   const sessions=Object.values(sById).filter(s=> !tomb[s.id]);
-  // projects/events (합집합, newer가 충돌 우선 → older 먼저 채우고 newer로 덮음)
-  const union=(key)=>{ const m={}; (older[key]||[]).forEach(x=>m[x.id]=x); (newer[key]||[]).forEach(x=>m[x.id]=x); return Object.values(m).filter(x=> !tomb[x.id]); };
+  // projects/events (memos와 동일: id별 updatedAt 최신 우선, tombstone 적용)
+  // 기존엔 최상위 updatedAt 기준 union이라, 다른 기기에서 편집한 일정이 충돌 시 유실되던 문제를 수정.
+  const byId=(key)=>{ const o={}; (L[key]||[]).forEach(x=>{o[x.id]=x;}); (R[key]||[]).forEach(x=>{ const e=o[x.id]; if(!e||(x.updatedAt||0)>(e.updatedAt||0)) o[x.id]=x; }); return Object.values(o).filter(x=>alive(x.id,x.updatedAt)); };
   // settings/top3/weekNotes는 키별 얕은 병합(양쪽 변경 보존, 충돌 시 newer 우선),
   // holidays는 합집합 — 기존엔 'newer 통째로'라 한쪽 변경이 유실되던 비대칭 버그 수정.
   const mergeMap=(key)=>Object.assign({}, older[key]||{}, newer[key]||{});
   return {
     tasks, sessions, memos, folders,
-    projects: union('projects'),
-    events: union('events'),
+    projects: byId('projects'),
+    events: byId('events'),
     settings: mergeMap('settings'),
     top3: mergeMap('top3'),
     weekNotes: mergeMap('weekNotes'),

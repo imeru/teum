@@ -1572,8 +1572,8 @@
       const data={title,freq:'once',allDay,startDate,endDate,start,duration:dur,color:evColor,
         days:[],interval:1,monthMode:undefined,ordinal:undefined,weekday:undefined,endMode:'never',count:null,excludeHolidays:false};
       if(!state.events) state.events=[];
-      if(editingEventId){ const ex=state.events.find(x=>x.id===editingEventId); if(ex) Object.assign(ex,data); }
-      else state.events.push({id:uid(),...data});
+      if(editingEventId){ const ex=state.events.find(x=>x.id===editingEventId); if(ex){ Object.assign(ex,data); ex.updatedAt=Date.now(); } }
+      else state.events.push({id:uid(),...data,updatedAt:Date.now()});
       save(); $('#eventOverlay').classList.remove('show'); renderPlan(); return;
     }
     const interval=Math.max(1,+$('#ev-interval').value||1);
@@ -1593,8 +1593,8 @@
       weekday:(freq==='monthly'&&monthMode==='weekday')?+$('#ev-weekday').value:undefined,
       startDate,endMode,endDate,count,excludeHolidays:$('#ev-exholiday').checked,color:evColor};
     if(!state.events) state.events=[];
-    if(editingEventId){ const ev=state.events.find(x=>x.id===editingEventId); if(ev) Object.assign(ev,data); }
-    else state.events.push({id:uid(),...data});
+    if(editingEventId){ const ev=state.events.find(x=>x.id===editingEventId); if(ev){ Object.assign(ev,data); ev.updatedAt=Date.now(); } }
+    else state.events.push({id:uid(),...data,updatedAt:Date.now()});
     save(); $('#eventOverlay').classList.remove('show'); renderPlan();
   }
 
@@ -1605,7 +1605,7 @@
     // GTD 보드: 처리 대기(inbox+다음행동+대기+언젠가) 합계
     set('#c-gtd', countFor(t=>!isDone(t)&&['inbox','next','waiting','someday'].includes(t.status)));
     set('#c-pomo', todaySessions().length);
-    set('#c-memo', (state.memos||[]).length);
+    set('#c-memo', (state.memos||[]).filter(m=>!m.trashedAt).length);
   }
   function todaySessions(){ return (state.sessions||[]).filter(s=>s.date===todayStr()); }
   function sessionsForTask(id){ return (state.sessions||[]).filter(s=>s.taskId===id).length; }
@@ -1729,7 +1729,7 @@
   }
   function saveProject(){
     const name=$('#p-name').value.trim(); if(!name) return;
-    state.projects.push({id:uid(),name,color:projColor}); save();
+    state.projects.push({id:uid(),name,color:projColor,updatedAt:Date.now()}); save();
     $('#projOverlay').classList.remove('show'); render();
   }
 
@@ -2276,18 +2276,20 @@
       const {data,error}=await supa.from('flowdo').select('data,updated_at').eq('id',syncKey()).maybeSingle();
       if(error) throw error;
       if(data&&data.data){
-        if(manual || data.updated_at>(state.updatedAt||0)){
-          const remote=migrate(data.data);
-          const merged=mergeStates(state, remote);       // 로컬+서버 항목 단위 병합(손실 방지)
-          const localContributed = sigOf(merged)!==sigOf(remote); // 로컬에만 있던 변경이 합쳐졌나
-          state=merged;
-          if(localContributed) state.updatedAt=Date.now();
-          localStorage.setItem(LS_KEY,JSON.stringify(state));
-          render();
-          if(localContributed) cloudPush(false);          // 병합본을 서버로 반영(convergence)
-          else lastSyncSig=syncSig();                      // 서버와 동일 → 재업로드 방지
-          if(manual) toast(localContributed?'서버 내용과 병합했습니다.':'서버에서 불러왔습니다.');
-        }
+        const remote=migrate(data.data);
+        // 게이트를 updated_at 비교가 아니라 '내용 차이'로 — mergeStates가 항목별 충돌 안전 병합이라
+        // 로컬 updatedAt이 더 커도(다른 항목을 최근 수정) 원격의 다른 변경을 병합해야 함.
+        if(!manual && sigOf(remote)===sigOf(state)){ lastSyncSig=syncSig(); return; }
+        const merged=mergeStates(state, remote);       // 로컬+서버 항목 단위 병합(손실 방지)
+        const localContributed = sigOf(merged)!==sigOf(remote); // 로컬에만 있던 변경이 합쳐졌나
+        const changed = sigOf(merged)!==sigOf(state);           // 화면 갱신 필요 여부
+        state=merged;
+        if(localContributed) state.updatedAt=Date.now();
+        localStorage.setItem(LS_KEY,JSON.stringify(state));
+        if(changed||manual) render();
+        if(localContributed) cloudPush(false);          // 병합본을 서버로 반영(convergence)
+        else lastSyncSig=syncSig();                      // 서버와 동일 → 재업로드 방지
+        if(manual) toast(localContributed?'서버 내용과 병합했습니다.':'서버에서 불러왔습니다.');
       } else if(manual){ toast('서버에 데이터가 없어 현재 내용을 올립니다.'); cloudPush(true); }
     }catch(err){ console.warn(err); if(manual) alert('불러오기 실패: '+(err.message||err)); }
   }
@@ -2374,6 +2376,14 @@
   updateAuthGate();
   startReminderLoop();
   if(cloud.url&&cloud.key) initSupa();
+  // 다른 기기의 변경을 가져오기 위한 재동기화(pull). 앱이 떠 있어도 최신화.
+  // 편집/모달 중에는 보류 — 병합 render가 작업 중 입력을 끊지 않도록.
+  function syncBusy(){ return !!editingMemoId || !!document.querySelector('#taskOverlay.show, #eventOverlay.show, #projOverlay.show'); }
+  function maybePull(){ if(supa && authUser && syncKey() && !syncBusy()) cloudPull(false); }
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') maybePull(); });
+  window.addEventListener('focus', maybePull);
+  window.addEventListener('online', maybePull);
+  setInterval(maybePull, 45000); // 주기적 폴링(가벼움: 내용 동일하면 네트워크만, render 생략)
   // 세션 확인이 지연되면(느린 네트워크 등) 로그인 버튼이라도 보여줌
   setTimeout(()=>{ if(!authChecked){ authChecked=true; updateAuthGate(); } }, 7000);
 
