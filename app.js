@@ -20,6 +20,7 @@
   let currentFilter = null; // {type:'project'|'tag', value}
   let editingId = null;
   let editingMemoId = null; // 메모 편집 중인 id (없으면 목록 보기)
+  let searchQuery = '';     // 검색어(검색 뷰)
   let memoFolderId = 'all'; // 메모 뷰에서 선택된 폴더: 'all' | 'trash' | folderId
   let memoDragId = null;    // 드래그 중인 메모 id (폴더로 끌어 이동)
   let selectedPrio = 4;
@@ -189,6 +190,7 @@
     if(currentView==='guide'){ renderGuide(); return; }
     if(currentView==='settings'){ renderSettings(); return; }
     if(currentView==='memo'){ renderMemo(); return; }
+    if(currentView==='search'){ renderSearch(); return; }
 
     let tasks, title, sub;
     if(currentFilter){
@@ -2043,6 +2045,46 @@
       if(s.view){ const b=el(`<button class="btn sm">${esc(s.btn)} →</button>`); b.onclick=()=>setView(s.view); card.querySelector('.g-body').appendChild(b); }
       sw.appendChild(card);
     });
+  }
+
+  // ---------- 검색 (할 일 + 메모 교차) ----------
+  function searchMatch(q, parts){ return parts.some(p => (p||'').toLowerCase().includes(q)); }
+  function renderSearch(){
+    $('#viewTitle').textContent='검색';
+    $('#viewSub').textContent='할 일과 메모에서 찾기';
+    document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='search'));
+    content.innerHTML='';
+    const wrap=el(`<div class="search-view">
+      <div class="search-bar">${svgIco('search')}<input id="searchInput" type="search" placeholder="할 일·메모 검색…" autocomplete="off" /></div>
+      <div id="searchResults"></div>
+    </div>`);
+    content.appendChild(wrap);
+    const input=wrap.querySelector('#searchInput');
+    input.value=searchQuery;
+    input.addEventListener('input',()=>{ searchQuery=input.value; renderSearchResults(); });
+    renderSearchResults();
+    setTimeout(()=>input.focus(),50);
+  }
+  function renderSearchResults(){
+    const host=$('#searchResults'); if(!host) return; host.innerHTML='';
+    const q=searchQuery.trim().toLowerCase();
+    if(!q){ host.appendChild(el(`<div class="empty"><div class="big">${svgIco('search')}</div>할 일과 메모를 한 번에 찾습니다.</div>`)); return; }
+    const taskHits=sortTasks(state.tasks.filter(t=>searchMatch(q,[t.title,t.notes,(t.tags||[]).join(' '),(t.subtasks||[]).map(s=>s.title).join(' ')])));
+    const memoHits=(state.memos||[]).filter(m=>!m.trashedAt&&searchMatch(q,[m.title,memoHtmlToText(m.body||'')]));
+    if(!taskHits.length&&!memoHits.length){ host.appendChild(el(`<div class="empty">'${esc(searchQuery.trim())}'에 대한 결과가 없습니다.</div>`)); return; }
+    if(taskHits.length){
+      host.appendChild(el(`<div class="search-group">할 일 <span>${taskHits.length}</span></div>`));
+      const list=el(`<div class="tasklist"></div>`); taskHits.forEach(t=>list.appendChild(taskRow(t))); host.appendChild(list);
+    }
+    if(memoHits.length){
+      host.appendChild(el(`<div class="search-group">메모 <span>${memoHits.length}</span></div>`));
+      memoHits.forEach(m=>{
+        const snip=memoHtmlToText(m.body||'').slice(0,90);
+        const r=el(`<div class="search-memo"><div class="sm-title">${svgIco('note')} ${esc(memoDisplayTitle(m))}</div>${snip?`<div class="sm-snip">${esc(snip)}</div>`:''}</div>`);
+        r.onclick=()=>{ editingMemoId=m.id; setView('memo'); };
+        host.appendChild(r);
+      });
+    }
   }
 
   // ---------- Settings / Cloud sync ----------

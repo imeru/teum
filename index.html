@@ -48,6 +48,7 @@
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l1 13.5a1 1 0 0 0 1 .9h7a1 1 0 0 0 1-.9l1-13.5M10 10.5v6M14 10.5v6"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3.5h6M10 3.5l-.5 6-2.5 2.3v1.4h10v-1.4L14.5 9.5 14 3.5M12 13.5V20.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5l5 5"/></symbol>
 </defs></svg>
 <!-- 로그인 게이트 (로그인 전까지 앱 위를 덮음) -->
 <div id="authGate" class="auth-gate show checking">
@@ -86,6 +87,7 @@
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="brand"><img class="brand-mark" src="icons/logo-symbol-tight.svg" alt="TEUM" /> TEUM</div>
+    <button class="nav" data-view="search"><span class="ico"><svg><use href="#i-search"/></svg></span> 검색</button>
     <button class="nav" data-view="today"><span class="ico"><svg><use href="#i-today"/></svg></span> 오늘 <span class="count" id="c-today"></span></button>
     <button class="nav" data-view="suggest"><span class="ico"><svg><use href="#i-suggest"/></svg></span> 지금 이 틈</button>
     <button class="nav" data-view="plan"><span class="ico"><svg><use href="#i-plan"/></svg></span> 타임박스</button>

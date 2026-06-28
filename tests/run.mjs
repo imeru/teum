@@ -735,6 +735,41 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('merge projects: 충돌 시 항목 updatedAt 최신 우선', mg.projects.find(x => x.id === 'PX').name === '로컬');
 }
 
+// ───────────────────────── 검색 (할 일 + 메모) ─────────────────────────
+{
+  section('검색');
+  const { $, $$, getErr } = boot(baseState({
+    tasks: [
+      { id: 't1', title: '캠핑 예약 전화', status: 'next', priority: 3, notes: '', tags: ['@개인'], createdAt: 1, updatedAt: 1 },
+      { id: 't2', title: '논문 초록', status: 'next', priority: 2, notes: '', tags: [], createdAt: 2, updatedAt: 1 },
+    ],
+    memos: [
+      { id: 'm1', title: '캠핑 준비물', body: '프로판 가스 2개\n맥주', color: '', createdAt: 1, updatedAt: 5 },
+      { id: 'm2', title: '독서 메모', body: '몰입에 관하여', color: '', createdAt: 2, updatedAt: 6 },
+    ],
+  }));
+  ck('런타임 에러 없음', !getErr());
+  ck('사이드바 검색 메뉴', !!$('.nav[data-view="search"]'));
+  $('.nav[data-view="search"]').click();
+  ck('검색 입력창 존재', !!$('#searchInput'));
+  const type = v => { const i = $('#searchInput'); i.value = v; i.dispatchEvent(new (i.ownerDocument.defaultView).Event('input', { bubbles: true })); };
+  type('캠핑');
+  let txt = $('#searchResults').textContent;
+  ck('할 일 매칭(캠핑 예약 전화)', txt.includes('캠핑 예약 전화'));
+  ck('메모 매칭(캠핑 준비물)', txt.includes('캠핑 준비물'));
+  ck('비매칭 제외(논문/독서)', !txt.includes('논문 초록') && !txt.includes('독서 메모'));
+  // 본문 텍스트로도 검색
+  type('프로판');
+  ck('메모 본문 검색', $('#searchResults').textContent.includes('캠핑 준비물'));
+  // 결과 없음
+  type('존재하지않는검색어zzz');
+  ck('결과 없음 안내', /결과가 없습니다/.test($('#searchResults').textContent));
+  // 메모 결과 클릭 → 메모 편집으로 이동
+  type('독서');
+  $('.search-memo').click();
+  ck('메모 결과 클릭 → 메모 뷰', $('#viewTitle').textContent === '메모');
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

@@ -506,6 +506,18 @@ input,textarea,select{font-family:inherit}
 .badge-sync{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--panel-2);color:var(--muted);border:1px solid var(--border)}
 .badge-sync.on{color:var(--green);border-color:var(--green)}
 .badge-sync.err{color:var(--red);border-color:var(--red)}
+/* 검색 */
+.search-view{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.search-bar{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+.search-bar .ico-sm{color:var(--muted);flex:0 0 auto}
+.search-bar input{flex:1;border:none;background:none;outline:none;font-size:15px;color:var(--text)}
+.search-group{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin:8px 2px 2px}
+.search-group span{color:var(--accent)}
+#searchResults{display:flex;flex-direction:column;gap:10px}
+.search-memo{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 15px;box-shadow:var(--shadow);cursor:pointer;transition:.12s}
+.search-memo:hover{border-color:var(--accent)}
+.search-memo .sm-title{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.search-memo .sm-snip{font-size:13px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 code{background:var(--panel-2);padding:1px 6px;border-radius:5px;font-size:12px}
 pre{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-x:auto;font-size:12px}
 
