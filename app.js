@@ -1,4 +1,5 @@
-/* FlowDo — GTD · 타임블락킹 할 일 관리 (단일 PWA, vanilla JS) */
+/* 틈(TEUM) — GTD · 타임블로킹 · 뽀모도로 시간관리 (단일 PWA, vanilla JS)
+   참고: localStorage 키(flowdo.*)·Supabase 테이블명(flowdo)은 기존 데이터 호환을 위해 레거시명 유지. */
 (() => {
   'use strict';
 
@@ -1586,62 +1587,34 @@
     $('#viewSub').textContent='클라우드 동기화 · 데이터';
     document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view==='settings'));
     content.innerHTML='';
+    const box=el(`<div style="max-width:640px;display:flex;flex-direction:column;gap:18px"></div>`);
+    box.appendChild(settingsAccountCard());
+    box.appendChild(settingsInstallCard());
+    box.appendChild(settingsNotifyCard());
+    box.appendChild(settingsHolidayCard());
+    box.appendChild(settingsBackupCard());
+    content.appendChild(box);
+  }
+  function settingsAccountCard(){
     const authBox = authUser
       ? `<div class="row" style="align-items:center"><div class="note" style="flex:1">${svgIco('done')} Google 로그인됨: <b>${esc(authUser.email||'계정')}</b><br>이 계정으로 모든 기기가 자동 동기화됩니다.</div><button class="btn" id="cf-logout">로그아웃</button></div>`
       : `<button class="btn primary" id="cf-google">Google 계정으로 로그인</button><div class="note">로그인하면 어느 기기에서든 같은 데이터가 자동으로 동기화됩니다.</div>`;
-    const box=el(`<div style="max-width:640px;display:flex;flex-direction:column;gap:18px">
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
-        <strong>${svgIco('user')} 계정</strong>
-        ${authBox}
-        <div class="note"><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--accent)">개인정보처리방침</a></div>
-      </div>
-
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
-        <strong>${svgIco('download')} 앱으로 설치</strong>
-        <div class="note">홈 화면·독에 설치하면 앱처럼 바로 열리고, 띄워두기 쉬워 알림을 놓치지 않습니다.</div>
-        <div id="install-area"></div>
-      </div>
-
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
-        <strong>${svgIco('bell')} 알림</strong>
-        <div class="note">앱이 켜져 있을 때 타임블록 시작·마감 시간·일정 시작·뽀모도로 종료를 알려줍니다. (앱을 완전히 닫으면 동작하지 않습니다)</div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nt-on" style="width:auto" ${state.settings.notify?'checked':''}> 알림 사용</label>
-        <div class="row" style="align-items:flex-end">
-          <div class="field"><label>미리 알림 (분 전)</label>
-            <select id="nt-lead">${[0,1,3,5,10,15,30].map(m=>`<option value="${m}" ${(state.settings.notifyLead!=null?state.settings.notifyLead:5)===m?'selected':''}>${m===0?'정시':m+'분 전'}</option>`).join('')}</select>
-          </div>
-          <button class="btn" id="nt-test">테스트 알림</button>
-        </div>
-        <div class="note" id="nt-status"></div>
-      </div>
-
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
-        <strong>${svgIco('cal')} 공휴일 / 휴무일</strong>
-        <div class="note">여기에 등록한 날짜는 '공휴일 제외'를 켠 정기 일정에서 자동으로 빠집니다.</div>
-        <div class="row" style="align-items:flex-end">
-          <div class="field"><label>날짜 추가</label><input id="hol-date" type="date"></div>
-          <button class="btn" id="hol-add">추가</button>
-          <button class="btn" id="hol-kr">올해 한국 공휴일 추가</button>
-        </div>
-        <div id="hol-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-      </div>
-
-      <div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
-        <strong>${svgIco('save')} 데이터 백업 / 복원</strong>
-        <div class="row">
-          <button class="btn" id="exp">JSON 내보내기</button>
-          <button class="btn" id="imp">JSON 가져오기</button>
-          <button class="btn" id="rst" style="color:var(--p1)">초기화</button>
-        </div>
-        <input type="file" id="impFile" accept="application/json" style="display:none">
-      </div>
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
+      <strong>${svgIco('user')} 계정</strong>
+      ${authBox}
+      <div class="note"><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--accent)">개인정보처리방침</a></div>
     </div>`);
-    content.appendChild(box);
-
-    if(box.querySelector('#cf-google')) box.querySelector('#cf-google').onclick=googleLogin;
-    if(box.querySelector('#cf-logout')) box.querySelector('#cf-logout').onclick=googleLogout;
-    // 앱 설치
-    const installArea=box.querySelector('#install-area');
+    if(card.querySelector('#cf-google')) card.querySelector('#cf-google').onclick=googleLogin;
+    if(card.querySelector('#cf-logout')) card.querySelector('#cf-logout').onclick=googleLogout;
+    return card;
+  }
+  function settingsInstallCard(){
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
+      <strong>${svgIco('download')} 앱으로 설치</strong>
+      <div class="note">홈 화면·독에 설치하면 앱처럼 바로 열리고, 띄워두기 쉬워 알림을 놓치지 않습니다.</div>
+      <div id="install-area"></div>
+    </div>`);
+    const installArea=card.querySelector('#install-area');
     const renderInstall=()=>{
       installArea.innerHTML='';
       if(isStandalone()){ installArea.appendChild(el(`<div class="note">${svgIco('done')} 이미 앱으로 실행 중입니다.</div>`)); return; }
@@ -1662,12 +1635,22 @@
       }
     };
     renderInstall();
-    box.querySelector('#exp').onclick=exportJson;
-    box.querySelector('#imp').onclick=()=>$('#impFile').click();
-    box.querySelector('#impFile').onchange=importJson;
-    box.querySelector('#rst').onclick=()=>{ if(confirm('모든 로컬 데이터를 초기화할까요?')){ state=defaultState(); save(); render(); } };
-    // 알림 설정
-    const ntStatus=box.querySelector('#nt-status');
+    return card;
+  }
+  function settingsNotifyCard(){
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
+      <strong>${svgIco('bell')} 알림</strong>
+      <div class="note">앱이 켜져 있을 때 타임블록 시작·마감 시간·일정 시작·뽀모도로 종료를 알려줍니다. (앱을 완전히 닫으면 동작하지 않습니다)</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nt-on" style="width:auto" ${state.settings.notify?'checked':''}> 알림 사용</label>
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label>미리 알림 (분 전)</label>
+          <select id="nt-lead">${[0,1,3,5,10,15,30].map(m=>`<option value="${m}" ${(state.settings.notifyLead!=null?state.settings.notifyLead:5)===m?'selected':''}>${m===0?'정시':m+'분 전'}</option>`).join('')}</select>
+        </div>
+        <button class="btn" id="nt-test">테스트 알림</button>
+      </div>
+      <div class="note" id="nt-status"></div>
+    </div>`);
+    const ntStatus=card.querySelector('#nt-status');
     const refreshNtStatus=()=>{
       if(!notifySupported()){ ntStatus.textContent='이 브라우저는 알림을 지원하지 않습니다.'; return; }
       if(!state.settings.notify){ ntStatus.textContent='알림이 꺼져 있습니다.'; return; }
@@ -1675,7 +1658,7 @@
         ? '상태: <b style="color:var(--green)">켜짐</b> · 앱이 켜져 있을 때만 동작합니다.'
         : '브라우저 알림 권한이 필요합니다. 사이트 권한에서 허용해 주세요.';
     };
-    box.querySelector('#nt-on').onchange=async e=>{
+    card.querySelector('#nt-on').onchange=async e=>{
       if(e.target.checked){
         const ok=await enableNotifications();
         if(!ok){ e.target.checked=false; state.settings.notify=false; save(); refreshNtStatus(); return; }
@@ -1683,24 +1666,36 @@
       } else { state.settings.notify=false; }
       save(); startReminderLoop(); refreshNtStatus();
     };
-    box.querySelector('#nt-lead').onchange=e=>{ state.settings.notifyLead=+e.target.value||0; save(); };
-    box.querySelector('#nt-test').onclick=async()=>{
+    card.querySelector('#nt-lead').onchange=e=>{ state.settings.notifyLead=+e.target.value||0; save(); };
+    card.querySelector('#nt-test').onclick=async()=>{
       const ok=await enableNotifications(); if(!ok){ refreshNtStatus(); return; }
       showNotify('🔔 틈(TEUM) 알림','알림이 정상 동작합니다.','teum-test');
       toast('테스트 알림을 보냈어요. 안 보이면 OS 알림/방해금지(집중) 설정을 확인하세요.');
     };
     refreshNtStatus();
-    // 공휴일 관리
+    return card;
+  }
+  function settingsHolidayCard(){
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
+      <strong>${svgIco('cal')} 공휴일 / 휴무일</strong>
+      <div class="note">여기에 등록한 날짜는 '공휴일 제외'를 켠 정기 일정에서 자동으로 빠집니다.</div>
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label>날짜 추가</label><input id="hol-date" type="date"></div>
+        <button class="btn" id="hol-add">추가</button>
+        <button class="btn" id="hol-kr">올해 한국 공휴일 추가</button>
+      </div>
+      <div id="hol-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>`);
     const renderHol=()=>{
-      const list=box.querySelector('#hol-list'); list.innerHTML='';
+      const list=card.querySelector('#hol-list'); list.innerHTML='';
       const hs=(state.holidays||[]).slice().sort();
       if(!hs.length){ list.appendChild(el(`<div class="note">등록된 날짜가 없습니다.</div>`)); return; }
-      hs.forEach(d=>{ const chip=el(`<span class="chip">${d} <button class="iconbtn" style="padding:0 2px">✕</button></span>`);
+      hs.forEach(d=>{ const chip=el(`<span class="chip">${d} <button class="iconbtn" style="padding:0 2px" aria-label="${d} 삭제">✕</button></span>`);
         chip.querySelector('button').onclick=()=>{ state.holidays=state.holidays.filter(x=>x!==d); save(); renderHol(); };
         list.appendChild(chip); });
     };
-    box.querySelector('#hol-add').onclick=()=>{ const v=box.querySelector('#hol-date').value; if(v&&!(state.holidays||[]).includes(v)){ if(!state.holidays)state.holidays=[]; state.holidays.push(v); save(); renderHol(); } };
-    box.querySelector('#hol-kr').onclick=()=>{
+    card.querySelector('#hol-add').onclick=()=>{ const v=card.querySelector('#hol-date').value; if(v&&!(state.holidays||[]).includes(v)){ if(!state.holidays)state.holidays=[]; state.holidays.push(v); save(); renderHol(); } };
+    card.querySelector('#hol-kr').onclick=()=>{
       const y=new Date().getFullYear();
       const list=(KR_HOLIDAYS[y]) || KR_HOLIDAYS_FIXED.map(md=>`${y}-${md}`); // 테이블 없으면 양력 고정일 폴백
       if(!state.holidays)state.holidays=[];
@@ -1708,12 +1703,29 @@
       save(); renderHol();
     };
     renderHol();
+    return card;
+  }
+  function settingsBackupCard(){
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
+      <strong>${svgIco('save')} 데이터 백업 / 복원</strong>
+      <div class="row">
+        <button class="btn" id="exp">JSON 내보내기</button>
+        <button class="btn" id="imp">JSON 가져오기</button>
+        <button class="btn" id="rst" style="color:var(--p1)">초기화</button>
+      </div>
+      <input type="file" id="impFile" accept="application/json" style="display:none">
+    </div>`);
+    card.querySelector('#exp').onclick=exportJson;
+    card.querySelector('#imp').onclick=()=>card.querySelector('#impFile').click();
+    card.querySelector('#impFile').onchange=importJson;
+    card.querySelector('#rst').onclick=()=>{ if(confirm('모든 로컬 데이터를 초기화할까요?')){ state=defaultState(); save(); render(); } };
+    return card;
   }
 
   function exportJson(){
     const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download=`flowdo-${todayStr()}.json`; a.click();
+    a.download=`teum-${todayStr()}.json`; a.click();
   }
   function importJson(e){
     const f=e.target.files[0]; if(!f) return;
