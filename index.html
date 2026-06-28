@@ -2,6 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
+<!-- Content-Security-Policy (GitHub Pages는 HTTP 헤더 불가 → meta로 적용).
+     모든 스크립트는 동일 출처(로컬 번들), 외부 통신은 Supabase 백엔드만 허용. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://btmyvomigijtikajaazv.supabase.co wss://btmyvomigijtikajaazv.supabase.co; font-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#102334" />
 <link rel="manifest" href="manifest.json" />
