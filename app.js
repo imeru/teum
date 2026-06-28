@@ -513,9 +513,13 @@
     </div>`);
     wrap.querySelector('.early-toggle').onclick=()=>{ dayExpanded=!dayExpanded; renderCalBody(); };
     const wk=el(`<div class="wk">
-      <div class="wk-head"><div class="wk-gutter"></div><div class="wk-heads"></div></div>
-      <div class="wk-allday"><div class="wk-gutter">일정</div><div class="wk-ad-main"><div class="wk-ad-banners"></div><div class="wk-ad-cols"></div></div></div>
-      <div class="wk-scroll"><div class="wk-grid"><div class="wk-times"></div><div class="wk-cols"></div></div></div>
+      <div class="wk-scroll">
+        <div class="wk-stickytop">
+          <div class="wk-head"><div class="wk-gutter"></div><div class="wk-heads"></div></div>
+          <div class="wk-allday"><div class="wk-gutter">일정</div><div class="wk-ad-main"><div class="wk-ad-banners"></div><div class="wk-ad-cols"></div></div></div>
+        </div>
+        <div class="wk-grid"><div class="wk-times"></div><div class="wk-cols"></div></div>
+      </div>
     </div>`);
     const heads=wk.querySelector('.wk-heads'), adcols=wk.querySelector('.wk-ad-cols'),
           banners=wk.querySelector('.wk-ad-banners'),
@@ -582,8 +586,9 @@
     body.appendChild(wrap);
     // 현재 시각 근처로 스크롤
     const sc=wk.querySelector('.wk-scroll');
+    const st=wk.querySelector('.wk-stickytop'); const base=st?st.offsetHeight:0; // 고정 헤더 높이 보정
     const now=new Date(); const mins=now.getHours()*60+now.getMinutes();
-    if(mins>=CAL_START*60&&mins<CAL_END*60) sc.scrollTop=Math.max(0,minToTop(mins)-sc.clientHeight/2);
+    if(mins>=CAL_START*60&&mins<CAL_END*60) sc.scrollTop=Math.max(0,base+minToTop(mins)-sc.clientHeight/2);
   }
 
   // ---- 월간 보기: 주별 행 + 연속 배너 + 셀 칩 ----
