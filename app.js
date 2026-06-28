@@ -296,7 +296,7 @@
     const pinned=m.pinned&&!inTrash;
     const card=el(`<div class="memo-card ${pinned?'pinned':''}" data-id="${m.id}">
       <div class="memo-card-body">
-        <div class="memo-title">${pinned?'<span class="mf-pin" title="상단 고정">'+svgIco('pin')+'</span>':''}${esc(memoDisplayTitle(m))}</div>
+        <div class="memo-title-row"><div class="memo-title">${pinned?'<span class="mf-pin" title="상단 고정">'+svgIco('pin')+'</span>':''}${esc(memoDisplayTitle(m))}</div></div>
         ${body?`<div class="memo-preview">${esc(body)}</div>`:''}
       </div>
       <div class="memo-actions"></div>
@@ -325,7 +325,8 @@
       sel.onchange=e=>{ e.stopPropagation(); moveMemo(m.id, sel.value); };
       const del=el(`<button class="iconbtn" data-act="del" title="휴지통으로">${svgIco('trash')}</button>`);
       del.onclick=e=>{ e.stopPropagation(); delMemo(m.id); };
-      acts.appendChild(pin); acts.appendChild(sel); acts.appendChild(del);
+      card.querySelector('.memo-title-row').appendChild(sel); // 폴더는 제목 옆 메타 칩으로
+      acts.appendChild(pin); acts.appendChild(del);            // 우측 액션은 고정·휴지통만
     }
     return card;
   }

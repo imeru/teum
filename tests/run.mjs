@@ -572,6 +572,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('메모 카드 2개', $$('.memo-card').length === 2);
   ck('제목 없으면 본문 첫 줄 표시', $$('.memo-card .memo-title').some(e => e.textContent.includes('제목없는 메모 본문')));
   ck('색상 메모 좌측 강조선', $$('.memo-card').some(c => c.style.borderLeft && c.style.borderLeft.includes('3px')));
+  // 컨트롤 배치: 폴더는 제목 옆(.memo-title-row), 우측 액션은 고정·휴지통만(select 없음)
+  ck('폴더 칩이 제목 행에 위치', !!$('.memo-card .memo-title-row .memo-move'));
+  ck('우측 액션에 폴더 select 없음', !$('.memo-card .memo-actions .memo-move') && $$('.memo-card .memo-actions [data-act]').length >= 1);
   // 새 메모 추가 → 에디터 열림
   $('#memoAdd').click();
   ck('새 메모 추가 → state 3개', JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.length === 3);

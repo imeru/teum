@@ -92,7 +92,8 @@ input,textarea,select{font-family:inherit}
 .memo-card{display:flex;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:15px 18px;box-shadow:var(--shadow);transition:.12s}
 .memo-card:hover{border-color:#cdd0e0}
 .memo-card-body{flex:1;min-width:0;cursor:pointer}
-.memo-title{font-size:15px;font-weight:600;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+.memo-title-row{display:flex;align-items:center;gap:8px;min-width:0}
+.memo-title{font-size:15px;font-weight:600;line-height:1.35;min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .memo-preview{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .memo-actions{display:flex;gap:2px;opacity:0;transition:.12s}
 .memo-card:hover .memo-actions{opacity:1}
@@ -139,7 +140,9 @@ input,textarea,select{font-family:inherit}
 .memo-folder .ico-sm{width:15px;height:15px;vertical-align:-3px}
 .memo-actions .iconbtn.on{color:var(--accent);background:var(--accent-soft)}
 .memo-actions .iconbtn[data-act="restore"]{font-size:12px;padding:5px 8px;width:auto}
-.memo-move{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;height:28px;max-width:96px;font-size:12px;outline:none;cursor:pointer}
+/* 제목 옆 폴더 칩 — 평소엔 조용한 메타, hover/focus 시 컨트롤로 또렷 */
+.memo-move{flex:0 0 auto;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:7px;height:24px;max-width:120px;font-size:12px;outline:none;cursor:pointer;padding:0 4px}
+.memo-move:hover,.memo-move:focus{border-color:var(--border);background:var(--panel-2);color:var(--text)}
 /* Quill 에디터 — 앱 테마에 맞춤(라이트/다크 공용) */
 .memo-quill-toolbar.ql-toolbar.ql-snow,.ql-toolbar.ql-snow{border-color:var(--border);background:var(--panel-2);border-radius:10px 10px 0 0}
 .memo-quill.ql-container.ql-snow{border-color:var(--border);border-radius:0 0 12px 12px;font-family:inherit}
