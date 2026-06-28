@@ -57,11 +57,25 @@
     <div class="auth-login">
       <h1 class="auth-title">모든 틈을<br>의미 있는 진전으로</h1>
       <p class="auth-sub">GTD · 타임블로킹 · 뽀모도로로<br>지금 가진 틈을 가장 잘 쓰는 하루.</p>
-      <button id="gate-google" class="auth-google" type="button">
+      <label class="auth-consent"><input type="checkbox" id="gate-consent" /> <span>개인정보 <a href="privacy.html" target="_blank" rel="noopener">수집·이용</a>에 동의합니다 (필수)</span></label>
+      <button id="gate-google" class="auth-google" type="button" disabled>
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
         Google로 시작하기
       </button>
-      <p class="auth-note">로그인하면 모든 기기에서 같은 데이터로 이어집니다.</p>
+      <p class="auth-note">로그인하면 모든 기기에서 같은 데이터로 이어집니다. · <a href="privacy.html" target="_blank" rel="noopener">개인정보처리방침</a></p>
+    </div>
+  </div>
+</div>
+<!-- 이미 로그인된 사용자 중 동의 기록이 없는 경우 차단 동의 모달 -->
+<div class="overlay" id="consentOverlay">
+  <div class="modal" style="width:min(420px,100%)">
+    <div class="modal-head">개인정보 수집·이용 동의</div>
+    <div class="modal-body">
+      <p class="note" style="line-height:1.7">틈(TEUM)은 구글 로그인(이메일·계정 식별자)과 할 일·일정 데이터를 기기 간 동기화하기 위해 개인정보를 수집·이용합니다. 자세한 항목·목적·보유기간은 <a href="privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>에서 확인하실 수 있습니다.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="consent-logout" style="margin-right:auto;color:var(--p1)">로그아웃</button>
+      <button class="btn primary" id="consent-agree">동의하고 계속</button>
     </div>
   </div>
 </div>

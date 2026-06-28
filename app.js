@@ -1588,6 +1588,7 @@
       <div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
         <strong>${svgIco('user')} 계정</strong>
         ${authBox}
+        <div class="note"><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--accent)">개인정보처리방침</a></div>
       </div>
 
       <div class="task" style="flex-direction:column;align-items:stretch;gap:12px">
@@ -1723,13 +1724,13 @@
       // 기존 세션 확인 + 상태 변화 구독 (Google 로그인)
       supa.auth.getSession().then(({data})=>{
         authUser=data&&data.session?data.session.user:null;
-        authChecked=true; updateAuthGate();
+        authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(syncKey()) cloudPull(false);
       });
       supa.auth.onAuthStateChange((_e,session)=>{
         authUser=session?session.user:null;
-        authChecked=true; updateAuthGate();
+        authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(authUser&&syncKey()) cloudPull(false);
       });
@@ -1743,7 +1744,18 @@
     g.classList.toggle('checking', !authChecked);
     g.classList.toggle('show', !authUser);
   }
+  const PRIVACY_VERSION='2026-06-27'; // 동의 버전(방침 개정 시 갱신)
+  function recordConsent(){ try{ localStorage.setItem('flowdo.privacyConsent', JSON.stringify({v:PRIVACY_VERSION, at:new Date().toISOString()})); }catch(_){} }
+  function hasConsent(){ try{ return !!localStorage.getItem('flowdo.privacyConsent'); }catch(_){ return false; } }
+  // 이미 로그인됐지만 동의 기록이 없는 사용자(기존 세션)에게 동의를 받음
+  function maybeRequireConsent(){
+    const ov=document.getElementById('consentOverlay'); if(!ov) return;
+    ov.classList.toggle('show', !!(authUser && !hasConsent()));
+  }
   async function googleLogin(){
+    const c=document.getElementById('gate-consent');
+    if(c && !c.checked){ alert('개인정보 수집·이용에 동의해 주세요.'); return; }
+    recordConsent(); // 수집 전 동의 기록
     if(!supa){ await initSupa(); }
     if(!supa){ alert('로그인 서버에 연결하지 못했습니다. 네트워크를 확인해 주세요.'); return; }
     const {error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
@@ -1867,6 +1879,11 @@
   // ---------- Boot ----------
   const gateBtn=document.getElementById('gate-google');
   if(gateBtn) gateBtn.onclick=googleLogin;
+  const gateConsent=document.getElementById('gate-consent');
+  if(gateConsent && gateBtn) gateConsent.onchange=()=>{ gateBtn.disabled=!gateConsent.checked; };
+  { const ag=document.getElementById('consent-agree'), lo=document.getElementById('consent-logout');
+    if(ag) ag.onclick=()=>{ recordConsent(); maybeRequireConsent(); };
+    if(lo) lo.onclick=()=>{ googleLogout(); maybeRequireConsent(); }; }
   // PWA 설치 프롬프트 캡처 (Chromium 계열)
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(currentView==='settings') renderSettings(); });
   window.addEventListener('appinstalled', ()=>{ deferredInstall=null; toast('앱이 설치되었습니다.'); if(currentView==='settings') renderSettings(); });

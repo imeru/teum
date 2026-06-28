@@ -455,6 +455,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('대체공휴일 날짜 빨강(d-sun)', subCell && subCell.classList.contains('d-sun'));
 }
 
+// ───────────────────────── 17) 개인정보 동의 / 처리방침 ─────────────────────────
+{
+  section('개인정보 동의');
+  const { $, getErr } = boot(baseState());
+  ck('런타임 에러 없음', !getErr());
+  // 로그인 게이트에 동의 체크박스 + 처리방침 링크
+  ck('동의 체크박스 존재', !!$('#gate-consent'));
+  ck('게이트에 처리방침 링크', !![...document.querySelectorAll('.auth-login a')].find(a => a.getAttribute('href') === 'privacy.html'));
+  // 기본은 미동의 → 로그인 버튼 비활성화
+  ck('미동의 시 로그인 버튼 disabled', $('#gate-google').disabled === true);
+  // 체크하면 활성화
+  $('#gate-consent').checked = true; $('#gate-consent').dispatchEvent(new window.Event('change'));
+  ck('동의 시 로그인 버튼 활성화', $('#gate-google').disabled === false);
+  // privacy.html 파일 존재 + 필수 항목 포함
+  const priv = fs.readFileSync(path.join(ROOT, 'privacy.html'), 'utf8');
+  ck('privacy.html 존재', priv.length > 0);
+  ck('처리방침 필수 항목 포함', ['처리 목적', '보유', '위탁', '보호책임자', '권리'].every(k => priv.includes(k)));
+  // 동의 모달이 마크업에 존재(기존 세션 대비)
+  ck('기존 세션 동의 모달 존재', !!$('#consentOverlay'));
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
