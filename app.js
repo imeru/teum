@@ -1594,7 +1594,7 @@
         <div class="row" style="align-items:flex-end">
           <div class="field"><label>날짜 추가</label><input id="hol-date" type="date"></div>
           <button class="btn" id="hol-add">추가</button>
-          <button class="btn" id="hol-kr">올해 한국 공휴일(고정일) 추가</button>
+          <button class="btn" id="hol-kr">올해 한국 공휴일 추가</button>
         </div>
         <div id="hol-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
@@ -1675,9 +1675,9 @@
     box.querySelector('#hol-add').onclick=()=>{ const v=box.querySelector('#hol-date').value; if(v&&!(state.holidays||[]).includes(v)){ if(!state.holidays)state.holidays=[]; state.holidays.push(v); save(); renderHol(); } };
     box.querySelector('#hol-kr').onclick=()=>{
       const y=new Date().getFullYear();
-      const fixed=[`${y}-01-01`,`${y}-03-01`,`${y}-05-05`,`${y}-06-06`,`${y}-08-15`,`${y}-10-03`,`${y}-10-09`,`${y}-12-25`];
+      const list=(KR_HOLIDAYS[y]) || KR_HOLIDAYS_FIXED.map(md=>`${y}-${md}`); // 테이블 없으면 양력 고정일 폴백
       if(!state.holidays)state.holidays=[];
-      fixed.forEach(d=>{ if(!state.holidays.includes(d)) state.holidays.push(d); });
+      list.forEach(d=>{ if(!state.holidays.includes(d)) state.holidays.push(d); });
       save(); renderHol();
     };
     renderHol();

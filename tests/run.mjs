@@ -377,6 +377,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('오늘 뷰엔 빠른추가 있음', !!$('#quickInput'));
 }
 
+// ───────────────────────── 14) 한국 공휴일(설·추석·대체공휴일) ─────────────────────────
+{
+  section('한국 공휴일');
+  const { $, window, getErr } = boot(baseState());
+  $('.nav[data-view="settings"]').click();
+  $('#hol-kr').click();
+  const hs = JSON.parse(window.localStorage.getItem('flowdo.state.v1')).holidays;
+  const yr = today.getFullYear();
+  ck('런타임 에러 없음', !getErr());
+  if (yr === 2026) {
+    ck('2026 공휴일 17개 추가', hs.length === 17);
+    ck('설날(02-17) 포함', hs.includes('2026-02-17'));
+    ck('추석(09-25) 포함', hs.includes('2026-09-25'));
+    ck('대체공휴일(03-02) 포함', hs.includes('2026-03-02'));
+  } else {
+    ck('폴백: 양력 고정일 8개', hs.length === 8 && hs.includes(`${yr}-01-01`));
+  }
+  // 중복 추가 방지
+  $('#hol-kr').click();
+  const hs2 = JSON.parse(window.localStorage.getItem('flowdo.state.v1')).holidays;
+  ck('재클릭해도 중복 없음', hs2.length === hs.length);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
