@@ -214,8 +214,8 @@
   // sortTasks·추천점수·describeEvent·isPastEvent·설치헬퍼는 logic.js로 분리됨
 
   // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
-  const svgIco=id=>`<svg class="ico-sm"><use href="#i-${id}"/></svg>`;
-  const cic=id=>`<svg class="cic"><use href="#i-${id}"/></svg>`; // 칩용 작은 라인 아이콘
+  const svgIco=id=>`<svg class="ico-sm" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+  const cic=id=>`<svg class="cic" aria-hidden="true"><use href="#i-${id}"/></svg>`; // 칩용 작은 라인 아이콘(장식)
   const GTD_COLS=[
     {status:'inbox', title:'Inbox', ico:svgIco('inbox')},
     {status:'next', title:'다음 할일', ico:svgIco('next')},

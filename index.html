@@ -68,9 +68,9 @@
   </div>
 </div>
 <!-- 이미 로그인된 사용자 중 동의 기록이 없는 경우 차단 동의 모달 -->
-<div class="overlay" id="consentOverlay">
+<div class="overlay" id="consentOverlay" role="dialog" aria-modal="true" aria-labelledby="consentHead">
   <div class="modal" style="width:min(420px,100%)">
-    <div class="modal-head">개인정보 수집·이용 동의</div>
+    <div class="modal-head" id="consentHead">개인정보 수집·이용 동의</div>
     <div class="modal-body">
       <p class="note" style="line-height:1.7">틈(TEUM)은 구글 로그인(이메일·계정 식별자)과 할 일·일정 데이터를 기기 간 동기화하기 위해 개인정보를 수집·이용합니다. 자세한 항목·목적·보유기간은 <a href="privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>에서 확인하실 수 있습니다.</p>
     </div>
@@ -115,7 +115,7 @@
   <!-- Main -->
   <main class="main">
     <div class="topbar">
-      <button class="btn ghost menu-btn" id="menuBtn"><svg class="ico-sm"><use href="#i-menu"/></svg></button>
+      <button class="btn ghost menu-btn" id="menuBtn" aria-label="메뉴 열기"><svg class="ico-sm" aria-hidden="true"><use href="#i-menu"/></svg></button>
       <div>
         <h1 id="viewTitle">오늘</h1>
         <div class="sub" id="viewSub"></div>
@@ -129,7 +129,7 @@
 </div>
 
 <!-- Task modal -->
-<div class="overlay" id="taskOverlay">
+<div class="overlay" id="taskOverlay" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
   <div class="modal">
     <div class="modal-head" id="taskModalTitle">새 할 일</div>
     <div class="modal-body">
@@ -213,9 +213,9 @@
 </div>
 
 <!-- Project modal -->
-<div class="overlay" id="projOverlay">
+<div class="overlay" id="projOverlay" role="dialog" aria-modal="true" aria-labelledby="projHead">
   <div class="modal" style="width:min(400px,100%)">
-    <div class="modal-head">새 프로젝트</div>
+    <div class="modal-head" id="projHead">새 프로젝트</div>
     <div class="modal-body">
       <div class="field"><label>이름</label><input id="p-name" placeholder="예: 논문 A 투고" /></div>
       <div class="field"><label>색상</label>
@@ -230,7 +230,7 @@
 </div>
 
 <!-- Event modal -->
-<div class="overlay" id="eventOverlay">
+<div class="overlay" id="eventOverlay" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
   <div class="modal" style="width:min(460px,100%)">
     <div class="modal-head" id="eventModalTitle">정기 일정 추가</div>
     <div class="modal-body">

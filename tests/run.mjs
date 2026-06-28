@@ -476,6 +476,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('기존 세션 동의 모달 존재', !!$('#consentOverlay'));
 }
 
+// ───────────────────────── 18) 접근성(a11y) ─────────────────────────
+{
+  section('접근성');
+  const { $, $$, getErr } = boot(baseState({
+    tasks: [{ id: 'a', title: '마감있음', status: 'next', priority: 2, due: todayDS, tags: [], createdAt: 1, updatedAt: 1 }]
+  }));
+  ck('런타임 에러 없음', !getErr());
+  // 아이콘 전용 메뉴 버튼에 접근명(aria-label)
+  ck('메뉴 버튼 aria-label', !!$('#menuBtn') && !!$('#menuBtn').getAttribute('aria-label'));
+  // 모달 dialog 역할
+  ck('할일 모달 role=dialog', $('#taskOverlay').getAttribute('role') === 'dialog');
+  ck('할일 모달 aria-modal', $('#taskOverlay').getAttribute('aria-modal') === 'true');
+  ck('일정 모달 aria-labelledby', $('#eventOverlay').getAttribute('aria-labelledby') === 'eventModalTitle');
+  ck('동의 모달 role=dialog', $('#consentOverlay').getAttribute('role') === 'dialog');
+  // 장식 아이콘은 aria-hidden (오늘 뷰의 마감 칩 cic)
+  $('.nav[data-view="today"]').click();
+  ck('장식 칩 아이콘 aria-hidden', $$('.chip svg[aria-hidden="true"]').length >= 1);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
