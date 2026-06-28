@@ -302,7 +302,10 @@
   function memoEditor(m){
     const wrap=el(`<div class="memo-editor">
       <div class="memo-editor-head">
-        <button class="btn sm" id="memoBack">${cic('plus')} 메모 목록</button>
+        <div class="memo-head-left">
+          <button class="btn sm" id="memoBack">${cic('plus')} 메모 목록</button>
+          <span class="memo-saved" id="memoSaved" aria-live="polite"></span>
+        </div>
         <button class="btn sm" id="memoDel" style="color:var(--p1)">삭제</button>
       </div>
       <input class="memo-edit-title" id="memoTitle" placeholder="제목 (생략하면 본문 첫 줄)" />
@@ -329,9 +332,14 @@
     const bo=wrap.querySelector('#memoBody');
     bo.innerHTML = (m.html!=null ? m.html : memoTextToHtml(m.body));
     const cIn=wrap.querySelector('#memoCreated'), uIn=wrap.querySelector('#memoUpdated');
+    const savedEl=wrap.querySelector('#memoSaved');
+    let savedTimer=null;
+    const showSaved=()=>{ savedEl.className='memo-saved saved'; savedEl.textContent='저장됨'; };
+    function markSaved(){ savedEl.className='memo-saved saving'; savedEl.textContent='저장 중…'; clearTimeout(savedTimer); savedTimer=setTimeout(showSaved,500); }
+    showSaved(); // 에디터 진입 시점엔 이미 저장된 상태
     const refreshDates=()=>{ if(document.activeElement!==uIn) uIn.value=memoDTInput(m.updatedAt); if(document.activeElement!==cIn) cIn.value=memoDTInput(m.createdAt); };
-    const syncBody=()=>{ m.html=bo.innerHTML; m.body=memoHtmlToText(bo.innerHTML); m.updatedAt=Date.now(); save(); refreshDates(); };
-    const touch=()=>{ m.updatedAt=Date.now(); save(); refreshDates(); };
+    const syncBody=()=>{ m.html=bo.innerHTML; m.body=memoHtmlToText(bo.innerHTML); m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
+    const touch=()=>{ m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
     ti.addEventListener('input',()=>{ m.title=ti.value; touch(); });
     bo.addEventListener('input', syncBody);
     bo.addEventListener('change', e=>{ const c=e.target; if(c&&c.matches&&c.matches('input[type="checkbox"]')){ if(c.checked) c.setAttribute('checked','checked'); else c.removeAttribute('checked'); syncBody(); } });
@@ -372,8 +380,8 @@
     wrap.querySelector('#memoImgFile').addEventListener('change',e=>{ const f=e.target.files&&e.target.files[0]; if(f){ bo.focus(); memoInsertImage(bo,f,syncBody); } e.target.value=''; });
     // 날짜/시간 (생성·최근 편집, 직접 수정 가능)
     cIn.value=memoDTInput(m.createdAt); uIn.value=memoDTInput(m.updatedAt);
-    cIn.addEventListener('change',()=>{ const t=new Date(cIn.value).getTime(); if(!isNaN(t)){ m.createdAt=t; save(); } });
-    uIn.addEventListener('change',()=>{ const t=new Date(uIn.value).getTime(); if(!isNaN(t)){ m.updatedAt=t; save(); } });
+    cIn.addEventListener('change',()=>{ const t=new Date(cIn.value).getTime(); if(!isNaN(t)){ m.createdAt=t; save(); markSaved(); } });
+    uIn.addEventListener('change',()=>{ const t=new Date(uIn.value).getTime(); if(!isNaN(t)){ m.updatedAt=t; save(); markSaved(); } });
     wrap.querySelector('#memoBack').onclick=()=>{ editingMemoId=null; render(); };
     wrap.querySelector('#memoDel').onclick=()=>{ delMemo(m.id); };
     return wrap;

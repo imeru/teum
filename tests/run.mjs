@@ -580,11 +580,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('서식 툴바 버튼 존재(B·I·목록·체크·그림)', $$('.memo-tool[data-cmd]').length >= 5);
   ck('글꼴·글자크기 셀렉트 존재', !!$('#memoFont') && !!$('#memoSize'));
   ck('생성·편집 일시 입력 존재', !!$('#memoCreated') && !!$('#memoUpdated'));
+  ck('저장됨 표시 존재', !!$('#memoSaved'));
+  ck('에디터 진입 시 저장됨 상태', $('#memoSaved').classList.contains('saved'));
   // 편집: 제목/본문 입력 (input 이벤트로 즉시 저장)
   $('#memoTitle').value = '회의 메모'; $('#memoTitle').dispatchEvent(new window.Event('input'));
   $('#memoBody').innerHTML = '결정사항 정리'; $('#memoBody').dispatchEvent(new window.Event('input'));
   const saved = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.title === '회의 메모');
   ck('편집 내용 저장', saved && saved.body === '결정사항 정리');
+  ck('편집 직후 저장 중 표시', $('#memoSaved').textContent.includes('저장') && $('#memoSaved').classList.contains('saving'));
   ck('본문 html 저장', typeof saved.html === 'string' && saved.html.includes('결정사항'));
   // 리치 본문 → 평문(body) 변환: 줄바꿈·체크박스
   $('#memoBody').innerHTML = '첫줄<br>둘째줄<label class="memo-chk"><input type="checkbox" checked> 완료항목</label>';
