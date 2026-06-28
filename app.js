@@ -29,6 +29,7 @@
   let syncTimer = null;
   let lastSyncSig = '';     // 마지막으로 서버에 올린 내용 시그니처(중복 업로드 방지)
   let syncError = false;    // 마지막 업로드 실패 여부(배지 표시용)
+  let rtChannel = null;     // Supabase Realtime 구독 채널(즉시 동기화)
   let authUser = null;      // 로그인된 Google 계정
   let authChecked = false;  // 세션 확인 완료 여부 (게이트 로딩 표시용)
   let deferredInstall = null; // PWA 설치 프롬프트 (Chromium 계열)
@@ -2249,13 +2250,13 @@
         authUser=data&&data.session?data.session.user:null;
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
-        if(syncKey()) cloudPull(false);
+        if(syncKey()){ cloudPull(false); subscribeRealtime(); }
       });
       supa.auth.onAuthStateChange((_e,session)=>{
         authUser=session?session.user:null;
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
-        if(authUser&&syncKey()) cloudPull(false);
+        if(authUser&&syncKey()){ cloudPull(false); subscribeRealtime(); } else unsubscribeRealtime();
       });
       updateSyncBadge();
       if(syncKey()) await cloudPull(false);
@@ -2285,6 +2286,7 @@
     if(error) alert('로그인 실패: '+error.message);
   }
   async function googleLogout(){
+    unsubscribeRealtime();
     if(supa) await supa.auth.signOut();
     authUser=null; updateSyncBadge(); updateAuthGate(); if(currentView==='settings') renderSettings();
   }
@@ -2431,6 +2433,18 @@
   // 편집/모달 중에는 보류 — 병합 render가 작업 중 입력을 끊지 않도록.
   function syncBusy(){ return !!editingMemoId || !!document.querySelector('#taskOverlay.show, #eventOverlay.show, #projOverlay.show'); }
   function maybePull(){ if(supa && authUser && syncKey() && !syncBusy()) cloudPull(false); }
+  // 실시간 동기화: 내 행(flowdo:id) 변경을 구독 → 즉시 maybePull(검증된 병합 경로 재사용). 폴링은 백업으로 유지.
+  function subscribeRealtime(){
+    if(!supa) return;
+    try{ if(rtChannel){ supa.removeChannel(rtChannel); rtChannel=null; } }catch(_){}
+    const key=syncKey(); if(!key) return;
+    try{
+      rtChannel=supa.channel('teum-sync')
+        .on('postgres_changes', {event:'*', schema:'public', table:'flowdo', filter:'id=eq.'+key}, ()=>{ maybePull(); })
+        .subscribe();
+    }catch(err){ console.warn('Realtime 구독 실패',err); }
+  }
+  function unsubscribeRealtime(){ try{ if(rtChannel&&supa) supa.removeChannel(rtChannel); }catch(_){} rtChannel=null; }
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') maybePull(); });
   window.addEventListener('focus', maybePull);
   window.addEventListener('online', maybePull);
