@@ -505,6 +505,7 @@ input,textarea,select{font-family:inherit}
 .sub-badge.all{color:#fff;background:var(--green)}
 .badge-sync{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--panel-2);color:var(--muted);border:1px solid var(--border)}
 .badge-sync.on{color:var(--green);border-color:var(--green)}
+.badge-sync.err{color:var(--red);border-color:var(--red)}
 code{background:var(--panel-2);padding:1px 6px;border-radius:5px;font-size:12px}
 pre{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-x:auto;font-size:12px}
 

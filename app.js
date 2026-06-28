@@ -27,6 +27,7 @@
   let supa = null;          // supabase client
   let syncTimer = null;
   let lastSyncSig = '';     // 마지막으로 서버에 올린 내용 시그니처(중복 업로드 방지)
+  let syncError = false;    // 마지막 업로드 실패 여부(배지 표시용)
   let authUser = null;      // 로그인된 Google 계정
   let authChecked = false;  // 세션 확인 완료 여부 (게이트 로딩 표시용)
   let deferredInstall = null; // PWA 설치 프롬프트 (Chromium 계열)
@@ -2247,6 +2248,8 @@
   }
   function updateSyncBadge(){
     const b=$('#syncBadge'); if(!b) return;
+    b.classList.toggle('err', !!(syncError && supa && syncKey()));
+    if(syncError && supa && syncKey()){ b.textContent='⚠ 동기화 오류'; b.classList.add('on'); return; }
     if(supa&&authUser){ b.textContent='Google'; b.classList.add('on'); }
     else if(supa&&syncKey()){ b.textContent='동기화'; b.classList.add('on'); }
     else { b.textContent='로컬'; b.classList.remove('on'); }
@@ -2264,12 +2267,13 @@
     const sig=syncSig();
     if(!manual && sig===lastSyncSig) return; // 내용 변화 없으면 네트워크 생략
     try{
-      const payload={id:syncKey(),data:state,updated_at:state.updatedAt};
+      // updated_at은 timestamptz 컬럼 → ISO 문자열로 전송(숫자 보내면 타입 불일치로 업로드 실패)
+      const payload={id:syncKey(),data:state,updated_at:new Date(state.updatedAt||Date.now()).toISOString()};
       const {error}=await supa.from('flowdo').upsert(payload);
       if(error) throw error;
-      lastSyncSig=sig;
+      lastSyncSig=sig; syncError=false; updateSyncBadge();
       if(manual) toast('서버로 올렸습니다.');
-    }catch(err){ console.warn(err); if(manual) alert('업로드 실패: '+(err.message||err)); }
+    }catch(err){ console.warn('cloudPush 실패',err); syncError=true; updateSyncBadge(); if(manual) alert('업로드 실패: '+(err.message||err)); }
   }
   async function cloudPull(manual){
     if(!supa||!syncKey()){ if(manual) alert('먼저 연결(또는 로그인)을 설정하세요.'); return; }
@@ -2291,7 +2295,11 @@
         if(localContributed) cloudPush(false);          // 병합본을 서버로 반영(convergence)
         else lastSyncSig=syncSig();                      // 서버와 동일 → 재업로드 방지
         if(manual) toast(localContributed?'서버 내용과 병합했습니다.':'서버에서 불러왔습니다.');
-      } else if(manual){ toast('서버에 데이터가 없어 현재 내용을 올립니다.'); cloudPush(true); }
+      } else {
+        // 서버에 행이 없음 → 로컬 내용을 올려 행 생성(다른 기기가 받을 수 있도록). 첫 로그인 초기 업로드 누락 방지.
+        lastSyncSig=''; cloudPush(manual);
+        if(manual) toast('서버에 데이터가 없어 현재 내용을 올렸습니다.');
+      }
     }catch(err){ console.warn(err); if(manual) alert('불러오기 실패: '+(err.message||err)); }
   }
   function toast(msg){
