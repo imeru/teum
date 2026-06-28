@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "session_id": "gjc-coordinator-d02a7492",
+  "state": "stale",
+  "ready_for_input": false,
+  "current_turn_id": null,
+  "last_turn_id": "turn-df3c8936-254c-4961-a3bf-840b79226cf5",
+  "updated_at": "2026-06-28T17:55:38.428Z",
+  "source": "coordinator",
+  "live": false,
+  "reason": "tmux_session_missing"
+}

@@ -453,6 +453,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const subCell = $$('.mo-cell').find(c => { const h = c.querySelector('.mo-hol'); return h && h.textContent.includes('대체공휴일'); });
   ck('대체공휴일 셀 존재', !!subCell);
   ck('대체공휴일 날짜 빨강(d-sun)', subCell && subCell.classList.contains('d-sun'));
+  // 다년: 내년(2027) 1월로 이동 → 신정(매년 고정 양력)이 자동 표시·빨강 (3월 2026 → +10개월)
+  for (let i = 0; i < 10; i++) $('#cal-next').click();
+  const ny = $$('.mo-cell').find(c => { const h = c.querySelector('.mo-hol'); return h && h.textContent.includes('신정'); });
+  ck('내년(2027) 신정 자동 표시', !!ny);
+  ck('내년 신정 날짜 빨강(d-sun)', ny && ny.classList.contains('d-sun'));
 }
 
 // ───────────────────────── 17) 개인정보 동의 / 처리방침 ─────────────────────────

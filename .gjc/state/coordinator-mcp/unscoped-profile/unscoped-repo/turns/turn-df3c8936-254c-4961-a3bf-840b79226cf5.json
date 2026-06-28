@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "turn_id": "turn-df3c8936-254c-4961-a3bf-840b79226cf5",
+  "session_id": "gjc-coordinator-d02a7492",
+  "namespace": {
+    "profile": null,
+    "repo": null
+  },
+  "status": "failed",
+  "prompt": {
+    "text": "/skill:ultragoal\n\nDelegated by coordinator MCP tool: gjc_delegate_execute\nWorkflow: execute\nCWD: /Users/hyunwoolim/Documents/dev/teum\nMutation intent: mutation requested; coordinator startup policy remains authoritative.\nOptional model hint: none\n\nTask:\n틈(TEUM) 앱에 두 작업을 수행하라. 제약을 반드시 지킬 것.\n\n## 작업 1 (구현): 달력 공휴일 다년 표시\n- 현재 constants.js의 KR_HOLIDAYS/KR_HOLIDAY_NAMES는 2026만 있어 2027·2028 공휴일이 달력에 색/이름으로 안 나온다.\n- 목표: 올해뿐 아니라 내년·후년도 달력(미니달력·일/주/월 뷰)에 공휴일이 빨간색+이름으로 표시되게 한다.\n- 권장 설계:\n  (a) 매년 고정 양력 공휴일(신정01-01·삼일절03-01·어린이날05-05·현충일06-06·광복절08-15·개천절10-03·한글날10-09·성탄절12-25)은 MM-DD 기준으로 **어떤 연도든 자동 인식**되도록 holidayName/dayColorClass(app.js)를 보강. (state.holidays에 없어도 색·이름 표시)\n  (b) 음력 기반(설날·추석·부처님오신날)과 대체공휴일은 연도별 데이터가 필요하므로 KR_HOLIDAYS/KR_HOLIDAY_NAMES에 2027·2028 항목 추가. 정확한 공식 날짜를 모르면 추정하지 말고, 추가하지 말고 그 사실을 결과에 명시하라(잘못된 날짜를 넣지 말 것 — 계획앱 신뢰성).\n- 설정의 '올해 공휴일 추가' 버튼은 현재 연도 기준 유지(색 표시는 위 (a)로 다년 자동 처리).\n\n## 작업 2 (계획만, 코드 변경 금지): 메모 기능 설계\n- 투두는 완료되면 사라지므로, 계속 참고할 정보를 보존할 '메모' 기능을 추가하려 한다.\n- docs/FEATURE_PHILOSOPHY(틈은 문서 편집기가 아님, build less, 차분·미니멀)에 부합하는 **최소·집중** 설계를 제안:\n  데이터 모델(state에 memos[] 추가, migrate), 사이드바 진입, 렌더(목록+간단 편집), 동기화 병합 반영(logic.js mergeStates), 헤드리스 테스트 항목, SW 캐시. 과한 기능(리치텍스트·폴더·태그 남발)은 배제.\n- 결과로 docs/ 또는 워크트리에 MEMO_PLAN.md를 작성해 단계별 계획을 남겨라.\n\n## 강한 제약 (반드시)\n- 무빌드·ES 모듈 금지. constants.js→helpers.js→logic.js→app.js 전역공유 클래식 스크립트만.\n- 작업1은 tests/run.mjs에 헤드리스 테스트 추가하고 `npm test` 전부 통과시킬 것(현재 164개).\n- service-worker.js의 CACHE 버전을 bump.\n- localStorage 키(flowdo.*)·Supabase 테이블명(flowdo) 유지.\n- 워크트리에서 작업하고, 변경을 커밋하라(푸시/배포는 오케스트레이터가 처리).\n완료 시 변경 파일 목록과 작업2 계획 요약을 반환하라.\n\nReturn durable status and artifact references through GJC runtime/coordinator state. Do not expose host-facing tmux controls.",
+    "created_at": "2026-06-28T17:55:37.301Z",
+    "source": "mcp"
+  },
+  "delivery": {
+    "delivered": false,
+    "queued": false,
+    "target": "gjc-coordinator-d02a7492:0.0",
+    "tmux_keys_sent": true,
+    "prompt_acknowledged": false,
+    "state": "tmux_keys_sent",
+    "attempts": [
+      {
+        "delivered": false,
+        "tmux_keys_sent": true,
+        "channel": "tmux_keys",
+        "created_at": "2026-06-28T17:55:37.317Z",
+        "reason": "awaiting_runtime_ack"
+      }
+    ]
+  },
+  "question_ids": [],
+  "final_response": {
+    "text": "Coordinator session unavailable: tmux_session_missing",
+    "format": "markdown",
+    "source": "coordinator_liveness",
+    "artifact_path": null,
+    "truncated": false
+  },
+  "evidence": [],
+  "error": {
+    "code": "session_unavailable",
+    "message": "tmux_session_missing",
+    "recoverable": true
+  },
+  "liveness": {
+    "checked_at": "2026-06-28T17:55:38.428Z",
+    "live": false,
+    "reason": "tmux_session_missing"
+  },
+  "created_at": "2026-06-28T17:55:37.301Z",
+  "updated_at": "2026-06-28T17:55:38.428Z",
+  "started_at": "2026-06-28T17:55:37.301Z",
+  "completed_at": "2026-06-28T17:55:38.428Z"
+}

@@ -411,9 +411,10 @@
   // 요일·공휴일 색상/이름 (일·공휴일=빨강, 토=파랑)
   function isHoliday(ds){ return (state.holidays||[]).includes(ds); }
   function holidayName(ds){
-    if(KR_HOLIDAY_NAMES[ds]) return KR_HOLIDAY_NAMES[ds];   // 정확 날짜(실제 공휴일)
-    if(!isHoliday(ds)) return null;                          // 등록된 휴일이 아니면 이름 없음
-    return KR_HOLIDAY_NAMES[ds.slice(5)] || '휴일';          // 사용자 추가 휴일
+    if(KR_HOLIDAY_NAMES[ds]) return KR_HOLIDAY_NAMES[ds];        // 연도별 정확 날짜(음력·대체공휴일)
+    if(KR_HOLIDAY_NAMES[ds.slice(5)]) return KR_HOLIDAY_NAMES[ds.slice(5)]; // 매년 고정 양력 공휴일(연도 무관 — 내년·후년도 자동 표시)
+    if(isHoliday(ds)) return '휴일';                             // 사용자가 직접 추가한 휴일
+    return null;
   }
   function dayColorClass(ds){
     const dow=new Date(ds+'T00:00:00').getDay();

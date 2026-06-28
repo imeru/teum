@@ -1,5 +1,5 @@
 /* 틈(TEUM) service worker — 오프라인 캐시 */
-const CACHE = 'teum-v50';
+const CACHE = 'teum-v51';
 const ASSETS = ['./','./index.html','./privacy.html','./app.js','./constants.js','./helpers.js','./logic.js','./supabase.js','./styles.css','./manifest.json',
   './icons/icon-192.png','./icons/icon-512.png','./icons/logo-symbol-tight.svg',
   './icons/teum-logo-horizontal.svg'];
