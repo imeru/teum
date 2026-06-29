@@ -1057,6 +1057,37 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음(마감 칩)', !getErr() && !w2.getErr());
 }
 
+// ───────────────────────── 23) 캘린더 완료 체크(캔슬아웃) ─────────────────────────
+{
+  section('캘린더 완료 체크');
+  // 타임박스 블록: 체크 → 완료 + 취소선(done) 유지
+  {
+    const b = boot(baseState({ tasks:[{ id:'tb', title:'블록작업', status:'next', priority:3, block:{date:todayDS,start:480,duration:30}, tags:[], createdAt:1, updatedAt:1 }] }), { planview:'day' });
+    b.$('.nav[data-view="plan"]').click();
+    const blk = b.$('.block-card');
+    ck('타임박스 블록 렌더', !!blk);
+    ck('블록에 완료 체크 버튼', !!(blk && blk.querySelector('.bc-check')));
+    blk.querySelector('.bc-check').click();
+    const st = JSON.parse(b.window.localStorage.getItem('flowdo.state.v1'));
+    ck('블록 체크 → 완료', st.tasks.find(x=>x.id==='tb').status==='done');
+    ck('완료 블록 취소선 유지(.done)', !!b.$('.block-card.done'));
+    ck('런타임 에러 없음(블록)', !b.getErr());
+  }
+  // '오늘 할 일' 풀: 체크 → 완료 + 취소선으로 남아 캘린더와 연동
+  {
+    const p = boot(baseState({ tasks:[{ id:'pt', title:'오늘마감일', status:'next', priority:2, due:todayDS, tags:[], createdAt:1, updatedAt:1 }] }), { planview:'day' });
+    p.$('.nav[data-view="plan"]').click();
+    const card = p.$$('.pool-task').find(c=>c.textContent.includes('오늘마감일'));
+    ck('풀에 오늘 할 일 노출', !!card);
+    ck('풀 항목 완료 체크 버튼', !!(card && card.querySelector('.pt-check')));
+    card.querySelector('.pt-check').click();
+    const st = JSON.parse(p.window.localStorage.getItem('flowdo.state.v1'));
+    ck('풀 체크 → 완료', st.tasks.find(x=>x.id==='pt').status==='done');
+    ck('완료해도 풀에 취소선 유지', !!p.$$('.pool-task.done').find(c=>c.textContent.includes('오늘마감일')));
+    ck('런타임 에러 없음(풀)', !p.getErr());
+  }
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

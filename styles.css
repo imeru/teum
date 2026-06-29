@@ -220,6 +220,13 @@ input,textarea,select{font-family:inherit}
 .pool-task.overdue{border-left:3px solid var(--p1)}
 .pt-dot{width:9px;height:9px;border-radius:50%;background:var(--p4);flex-shrink:0}
 .pt-dot.p1{background:var(--p1)} .pt-dot.p2{background:var(--p2)} .pt-dot.p3{background:var(--p3)}
+.pt-check{width:18px;height:18px;flex:0 0 18px;border-radius:50%;border:2px solid var(--p4);background:none;padding:0;display:grid;place-items:center;color:#fff}
+.pt-check.p1{border-color:var(--p1)} .pt-check.p2{border-color:var(--p2)} .pt-check.p3{border-color:var(--p3)}
+.pt-check.on{background:var(--green);border-color:var(--green)}
+.pt-check .cic{width:11px;height:11px}
+.pool-task:not(.done) .pt-check:hover{border-color:var(--green)}
+.pool-task.done{opacity:.6;cursor:default}
+.pool-task.done .pt-title{text-decoration:line-through;color:var(--muted)}
 .pt-title{flex:1;min-width:0}
 .pt-badge{font-size:11px;color:var(--red);background:rgba(210,72,63,.12);padding:1px 7px;border-radius:10px;white-space:nowrap}
 .overdue-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(210,72,63,.08);border:1px solid rgba(210,72,63,.28);color:var(--red);border-radius:11px;padding:10px 12px;font-size:13px;font-weight:600;margin-bottom:10px}
@@ -252,6 +259,14 @@ input,textarea,select{font-family:inherit}
 .block-card .time{font-size:10px;color:var(--accent);font-weight:600;white-space:nowrap}
 .block-card .bc-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
 .block-card .bc-x{position:absolute;top:1px;right:1px;padding:2px;font-size:11px;z-index:3}
+.block-card .bc-check{position:absolute;top:50%;left:6px;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;border:2px solid var(--accent);background:none;padding:0;display:grid;place-items:center;color:#fff;z-index:3;flex:0 0 auto}
+.block-card .bc-check.on{background:var(--green);border-color:var(--green)}
+.block-card .bc-check .cic{width:11px;height:11px}
+.block-card:not(.done) .bc-check:hover{border-color:var(--green)}
+.block-card .bc-main{padding-left:24px}  /* 체크 자리 확보 */
+.block-card.done{opacity:.6;border-left-color:var(--green)}
+.block-card.done .bc-title{text-decoration:line-through;color:var(--muted)}
+.block-card.done .time{color:var(--muted)}
 .block-card .block-resize{position:absolute;left:0;right:0;bottom:0;height:10px;cursor:ns-resize;touch-action:none;z-index:3}
 .block-card .block-resize::after{content:'';position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:24px;height:3px;border-radius:3px;background:var(--accent);opacity:.45}
 .block-card.p1{border-left-color:var(--p1)} .block-card.p2{border-left-color:var(--p2)}

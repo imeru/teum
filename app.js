@@ -1159,7 +1159,8 @@
     const pool=$('#pool'); pool.innerHTML='';
     const top3ids=getTop3().filter(Boolean);
     // 타임박스에는 '다음 할일(next)'만 배치 (Inbox·대기·언젠가는 GTD 보드에서 분류 후 노출)
-    const avail=state.tasks.filter(t=>!isDone(t)&&t.status==='next'&&(!t.block||t.block.date!==planDate)&&!top3ids.includes(t.id));
+    const notBoxedHere=t=>!t.block||t.block.date!==planDate;
+    const avail=state.tasks.filter(t=>!isDone(t)&&t.status==='next'&&notBoxedHere(t)&&!top3ids.includes(t.id));
     $('#poolCount').textContent=avail.length?`${avail.length}개`:'';
     const overdue=avail.filter(t=>isOverdue(t.due));
     if(overdue.length){
@@ -1167,8 +1168,11 @@
       banner.querySelector('button').onclick=()=>{ overdue.forEach(t=>{t.due=todayStr();t.updatedAt=Date.now();}); save(); renderPlan(); };
       pool.appendChild(banner);
     }
-    const dated=sortTasks(avail.filter(t=>(t.due&&(isOverdue(t.due)||t.due===planDate))||(t.block&&t.block.date===planDate)));
-    const undated=sortTasks(avail.filter(t=>!dated.includes(t)));
+    const isDatedFor=t=>!!(t.due&&(isOverdue(t.due)||t.due===planDate));
+    // 완료한 '오늘/예정' 할 일은 숨기지 않고 취소선으로 남겨 캘린더와 연동 표시
+    const doneDated=state.tasks.filter(t=>isDone(t)&&notBoxedHere(t)&&!top3ids.includes(t.id)&&isDatedFor(t));
+    const dated=sortTasks(avail.filter(isDatedFor).concat(doneDated));
+    const undated=sortTasks(avail.filter(t=>!isDatedFor(t)));
     addPoolGroup(pool, planDate===todayStr()?'오늘 할 일':'예정 할 일', dated);
     addPoolGroup(pool,'기본 할 일', undated);
     if(!avail.length){
@@ -1195,13 +1199,15 @@
     pool.appendChild(el(`<div class="pool-group-title">${label} <span style="color:var(--muted)">${list.length}</span></div>`));
     list.forEach(t=>{
       const pc=t.priority<=3?`p${t.priority}`:'';
-      const card=el(`<div class="pool-task ${isOverdue(t.due)?'overdue':''}" draggable="true">
-        <span class="pt-dot ${pc}"></span>
+      const done=isDone(t);
+      const card=el(`<div class="pool-task ${isOverdue(t.due)&&!done?'overdue':''} ${done?'done':''}" draggable="${!done}">
+        <button class="pt-check ${done?'on':(pc||'')}" title="${done?'완료 취소':'완료 표시'}" aria-label="${done?'완료 취소':'완료 표시'}">${done?cic('done'):''}</button>
         <span class="pt-title">${esc(t.title)}</span>
         ${subBadgeHTML(t)}
-        ${isOverdue(t.due)?'<span class="pt-badge">밀림</span>':''}
+        ${isOverdue(t.due)&&!done?'<span class="pt-badge">밀림</span>':''}
       </div>`);
-      card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);});
+      if(!done) card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);});
+      card.querySelector('.pt-check').onclick=e=>{e.stopPropagation();toggleDone(t.id);};
       card.querySelector('.pt-title').addEventListener('click',()=>openTask(t.id));
       pool.appendChild(card);
     });
@@ -1246,13 +1252,16 @@
     state.tasks.filter(t=>t.block&&t.block.date===planDate).forEach(t=>{
       const top=minToTop(t.block.start), height=Math.max(SNAP_MIN, t.block.duration)*PX_PER_MIN-2;
       const pc=t.priority<=2?`p${t.priority}`:'';
-      const card=el(`<div class="block-card ${pc}" draggable="true" style="top:${top}px;height:${height}px">
+      const done=isDone(t);
+      const card=el(`<div class="block-card ${pc} ${done?'done':''}" draggable="true" style="top:${top}px;height:${height}px">
+        <button class="bc-check ${done?'on':''}" title="${done?'완료 취소':'완료 표시'}" aria-label="${done?'완료 취소':'완료 표시'}">${done?cic('done'):''}</button>
         <div class="bc-main"><span class="time">${minToHHMM(t.block.start)}~${minToHHMM(t.block.start+t.block.duration)}</span><span class="bc-title">${esc(t.title)}${subBadgeHTML(t)}</span></div>
         <button class="bc-x iconbtn" title="배치 해제">✕</button>
         <div class="block-resize" title="드래그하여 길이 조절"></div>
       </div>`);
       card.addEventListener('dragstart',e=>{ if(resizing){e.preventDefault();return;} e.dataTransfer.setData('text/plain',t.id); const r=card.getBoundingClientRect(); dragOffsetMin=snapMin((e.clientY-r.top)/PX_PER_MIN); });
       card.addEventListener('dragend',()=>{dragOffsetMin=0;});
+      card.querySelector('.bc-check').onclick=e=>{e.stopPropagation();toggleDone(t.id);};
       card.querySelector('.bc-x').onclick=e=>{e.stopPropagation();t.block=null;t.updatedAt=Date.now();save();renderPlan();};
       card.querySelector('.bc-main').addEventListener('click',()=>openTask(t.id));
       initResize(card.querySelector('.block-resize'),card,t);
