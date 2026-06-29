@@ -48,7 +48,7 @@
       tasks: [],       // 빈 상태로 시작 — 온보딩은 '사용 가이드'(첫 실행 자동)와 빈 화면 안내가 담당
       projects: [],
       sessions: [],
-      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5 },
+      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5, focusOrder:null },
       top3: {},
       events: [],
       holidays: [],
@@ -68,6 +68,7 @@
     if(!s.settings) s.settings={ focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5 };
     if(s.settings.notify===undefined) s.settings.notify=false;
     if(s.settings.notifyLead===undefined) s.settings.notifyLead=5;
+    if(s.settings.focusOrder===undefined) s.settings.focusOrder=null; // 개인 집중 프로파일(미설정=null → 기존 추천 불변)
     if(!s.top3) s.top3={};
     if(!s.events) s.events=[];
     if(!s.holidays) s.holidays=[];
@@ -1860,7 +1861,8 @@
     const eligPool=state.tasks.filter(t=>!isDone(t)&&t.status==='next');
     const weighted=eligPool.filter(t=>t.weight==='light'||t.weight==='focus');
     const energyAvail = weighted.length>=2 || (eligPool.length>0 && weighted.length>=1 && weighted.length/eligPool.length>=0.3);
-    const timeMode=timeOfDayMode(new Date().getHours());
+    const nowHour=new Date().getHours();
+    const timeMode=profileMode(nowHour, state.settings.focusOrder); // 개인 프로파일 우선, 미설정/무효 시 시간대 휴리스틱
     const effMode = energyAvail ? (energyTouched?energyMode:timeMode) : null;
     if(energyAvail){
       const ep=el(`<div class="energy-pick" id="energyPick">
@@ -1874,7 +1876,10 @@
         b.onclick=()=>{ energyTouched=true; energyMode=(effMode===w?null:w); renderSuggest(); };
         ec.appendChild(b);
       });
-      if(!energyTouched && timeMode) ep.querySelector('#energyHint').textContent='이 시간대 추천';
+      if(!energyTouched && timeMode){ // 출처 정확: 이 시각의 기본이 프로파일에서 왔는가
+        const fromProfile = focusLevel(nowHour, state.settings.focusOrder)!=null;
+        ep.querySelector('#energyHint').textContent = fromProfile ? '내 집중 순서 반영' : '이 시간대 추천';
+      }
     }
 
     const cands=state.tasks.filter(t=>!isDone(t)&&t.status==='next'&&(!t.estimate||t.estimate<=suggestMin))
@@ -2184,6 +2189,7 @@
     box.appendChild(settingsAccountCard());
     box.appendChild(settingsInstallCard());
     box.appendChild(settingsNotifyCard());
+    box.appendChild(settingsFocusCard());
     box.appendChild(settingsHolidayCard());
     box.appendChild(settingsBackupCard());
     content.appendChild(box);
@@ -2266,6 +2272,40 @@
       toast('테스트 알림을 보냈어요. 안 보이면 OS 알림/방해금지(집중) 설정을 확인하세요.');
     };
     refreshNtStatus();
+    return card;
+  }
+  const FOCUS_LABELS={dawn:'아침 06–09',morn:'오전 09–12',lunch:'점심 12–14',noon:'오후 14–18',eve:'저녁 18–21',night:'밤 21–24'};
+  function settingsFocusCard(){
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
+      <strong>${svgIco('suggest')} 집중 시간대 순서</strong>
+      <div class="note">집중이 잘 되는 시간대 순서로 정렬하면, '지금 이 틈'이 지금 시각에 맞는 일(집중/가벼움)을 먼저 제안합니다. 설정하지 않으면 기존 추천 그대로예요.</div>
+      <div class="focus-order" id="focus-order"></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn sm ghost" id="focus-reset" style="color:var(--muted)">기본값으로</button></div>
+    </div>`);
+    const listEl=card.querySelector('#focus-order');
+    const curOrder=()=> isValidFocusOrder(state.settings.focusOrder) ? state.settings.focusOrder.slice() : FOCUS_KEYS.slice();
+    const move=(i,dir)=>{ const o=curOrder(); const j=i+dir; if(j<0||j>5) return; [o[i],o[j]]=[o[j],o[i]]; state.settings.focusOrder=o; save(); renderRows(); };
+    const renderRows=()=>{
+      const configured=isValidFocusOrder(state.settings.focusOrder);
+      const o=curOrder(); listEl.innerHTML='';
+      o.forEach((key,i)=>{
+        const eff = i<=1?['집중','foc']:(i>=4?['가벼움','lit']:['중립','neu']);
+        const row=el(`<div class="focus-row" data-focusblock="${key}">
+          <span class="focus-ord">${i+1}</span>
+          <span class="focus-name">${FOCUS_LABELS[key]}</span>
+          ${configured?`<span class="focus-eff ${eff[1]}">${eff[0]}</span>`:''}
+          <span class="focus-move">
+            <button class="iconbtn" data-act="up" ${i===0?'disabled':''} aria-label="${esc(FOCUS_LABELS[key])} 위로">▲</button>
+            <button class="iconbtn" data-act="down" ${i===5?'disabled':''} aria-label="${esc(FOCUS_LABELS[key])} 아래로">▼</button>
+          </span>
+        </div>`);
+        row.querySelector('[data-act="up"]').onclick=()=>move(i,-1);
+        row.querySelector('[data-act="down"]').onclick=()=>move(i,1);
+        listEl.appendChild(row);
+      });
+    };
+    card.querySelector('#focus-reset').onclick=()=>{ state.settings.focusOrder=null; save(); renderRows(); };
+    renderRows();
     return card;
   }
   function settingsHolidayCard(){

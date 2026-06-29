@@ -48,7 +48,7 @@
   - `block`: `{date, start(분), duration(분)}` — 타임박스 배치
 - `projects[]`: `{id,name,color}`
 - `sessions[]`: 뽀모도로 집중 기록 `{id,taskId,date,duration,at}`
-- `settings`: `{focus,short,long,longEvery}` (뽀모도로 분 단위)
+- `settings`: `{focus,short,long,longEvery}` (뽀모도로 분 단위) + `notify,notifyLead`(알림) + `focusOrder`(개인 집중 프로파일: 6블록 키 순열 또는 null=미설정 → '지금 이 틈' 기본 모드 결정. 미설정/무효 시 timeOfDayMode 폴백 → 추천 순위 불변)
 - `top3`: `{ 'YYYY-MM-DD': [taskId,taskId,taskId] }` (날짜별 우선순위 TOP3)
 - `events[]`: 정기(반복) 일정
   - `{id,title,start,duration,color,freq,interval,days[],monthMode,ordinal,weekday,startDate,endMode,endDate,count,excludeHolidays}`

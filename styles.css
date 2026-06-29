@@ -498,6 +498,15 @@ input,textarea,select{font-family:inherit}
 .prio-pick button[data-p="1"].sel{background:var(--p1)} .prio-pick button[data-p="2"].sel{background:var(--p2)}
 .prio-pick button[data-p="3"].sel{background:var(--p3)} .prio-pick button[data-p="4"].sel{background:var(--p4)}
 .lbl-hint{color:var(--muted);font-weight:400;font-size:11px}
+.focus-order{display:flex;flex-direction:column;gap:6px}
+.focus-row{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+.focus-ord{width:20px;height:20px;flex:0 0 20px;display:grid;place-items:center;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:50%}
+.focus-name{flex:1;font-size:14px}
+.focus-eff{font-size:12px;padding:2px 9px;border-radius:20px;background:var(--panel);border:1px solid var(--border);color:var(--muted)}
+.focus-eff.foc{color:var(--focus);border-color:transparent;background:var(--accent-soft)}
+.focus-move{display:flex;gap:2px}
+.focus-move .iconbtn{font-size:12px;line-height:1;padding:4px 6px;color:var(--muted)}
+.focus-move .iconbtn:disabled{opacity:.3;cursor:default}
 .proj-custom-color{display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted);cursor:pointer}
 .proj-custom-color input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer}
 .weight-pick{display:flex;gap:8px}

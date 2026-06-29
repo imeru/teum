@@ -988,6 +988,54 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
 }
 
+// ───────────────────────── 21) 개인 집중 프로파일 (6블록 순위) ─────────────────────────
+{
+  const ORDER = ['morn','dawn','lunch','noon','eve','night']; // rank0=morn(9-12) … rank5=night(21-24)
+  const { window: W, $, $$, getErr } = boot(baseState());
+  const { focusLevel, profileMode, hourToBlock, timeOfDayMode, mergeStates, isValidFocusOrder } = W;
+
+  section('집중 프로필 매핑');
+  ck('hourToBlock 후반 경계', hourToBlock(9)==='morn' && hourToBlock(12)==='lunch' && hourToBlock(14)==='noon' && hourToBlock(21)==='night');
+  ck('hourToBlock 시작 경계', hourToBlock(6)==='dawn' && hourToBlock(23)==='night');
+  ck('hourToBlock 미커버', hourToBlock(5)===null && hourToBlock(24)===null && hourToBlock(-1)===null);
+  ck('focusLevel rank 선형', focusLevel(10,ORDER)===1.0 && focusLevel(22,ORDER)===0.0);
+  ck('focusLevel 미설정→null', focusLevel(10,null)===null && focusLevel(10,['a'])===null);
+  ck('profileMode 2/2/2', profileMode(10,ORDER)==='focus' && profileMode(22,ORDER)==='light' && profileMode(13,ORDER)===null);
+  ck('isValidFocusOrder 순열만 인정', isValidFocusOrder(ORDER) && !isValidFocusOrder(['morn','morn','dawn','noon','eve','night']));
+
+  section('프로필 손상 내성');
+  ck('foreign-keys len6 → null', focusLevel(10,['x','x','x','x','x','x'])===null);
+  ck('dup-keys len6 → null', focusLevel(10,['dawn','dawn','morn','noon','eve','night'])===null);
+  ck('foreign+missing len6 → null', focusLevel(10,['dawn','morn','lunch','noon','eve','ZZZ'])===null);
+  ck('손상 프로필 → profileMode 폴백', profileMode(10,['x','x','x','x','x','x'])===timeOfDayMode(10));
+
+  section('추천 불변식(프로파일)');
+  const hrs = Array.from({length:24},(_,h)=>h);
+  ck('미설정 → 전 시각 폴백 동일', hrs.every(h=>profileMode(h,null)===timeOfDayMode(h)));
+  ck('무효 → 전 시각 폴백 동일', hrs.every(h=>profileMode(h,['a','b'])===timeOfDayMode(h)));
+  ck('정규화 가중 합=1', Math.abs((0.323+0.3145+0.2125+0.15)-1) < 1e-9);
+
+  section('프로필 동기화 병합');
+  ck('한쪽만 focusOrder → 보존', JSON.stringify(mergeStates({settings:{focusOrder:ORDER},updatedAt:20},{settings:{},updatedAt:10}).settings.focusOrder)===JSON.stringify(ORDER));
+  ck('null이 newer면 클로버', mergeStates({settings:{focusOrder:ORDER},updatedAt:10},{settings:{focusOrder:null},updatedAt:20}).settings.focusOrder===null);
+  ck('충돌 → newer 승', JSON.stringify(mergeStates({settings:{focusOrder:['night','eve','noon','lunch','dawn','morn']},updatedAt:10},{settings:{focusOrder:ORDER},updatedAt:20}).settings.focusOrder)===JSON.stringify(ORDER));
+
+  section('집중 순서 UI');
+  // baseState는 focusOrder 없음 → migrate가 null로 정규화(미설정) 검증
+  $('.nav[data-view="settings"]').click();
+  ck('설정에 6블록 컨트롤', $$('#focus-order [data-focusblock]').length===6);
+  ck('미설정 시 효과 라벨 없음', $$('.focus-eff').length===0);
+  ck('미설정 부팅 무에러', !getErr());
+  // 첫 행을 아래로 → 프로파일 확립(순열 저장)
+  $$('#focus-order .focus-row')[0].querySelector('[data-act="down"]').click();
+  const saved = JSON.parse(W.localStorage.getItem('flowdo.state.v1')).settings.focusOrder;
+  ck('재정렬 → focusOrder 순열 저장', Array.isArray(saved) && saved.length===6 && saved[0]==='morn' && saved[1]==='dawn');
+  ck('설정 후 효과 라벨 표시', $$('.focus-eff').length===6 && $$('.focus-eff')[0].textContent==='집중');
+  // 기본값으로 초기화
+  $('#focus-reset').click();
+  ck('초기화 → null', JSON.parse(W.localStorage.getItem('flowdo.state.v1')).settings.focusOrder===null);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

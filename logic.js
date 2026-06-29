@@ -36,6 +36,40 @@ function timeOfDayMode(hour){
   if(hour>=21&&hour<=23) return 'light';
   return null;
 }
+// 개인 집중 프로파일 — 하루 06~24시를 6개 거친 블록 [start,end)로. 라벨/색은 UI 전용.
+const FOCUS_BLOCKS = [['dawn',6,9],['morn',9,12],['lunch',12,14],['noon',14,18],['eve',18,21],['night',21,24]];
+const FOCUS_KEYS = FOCUS_BLOCKS.map(b=>b[0]);
+function hourToBlock(hour){
+  const h=Number(hour);
+  if(!Number.isFinite(h)) return null;
+  if(h<6||h>=24) return null;                       // 새벽 00~05 / 24↑ 미커버
+  for(const b of FOCUS_BLOCKS){ if(h>=b[1]&&h<b[2]) return b[0]; }
+  return null;
+}
+// 완전 순열만 인정(길이6·6키 정확히 1회씩). 아니면 전면 폴백.
+function isValidFocusOrder(o){
+  if(!Array.isArray(o)||o.length!==6) return false;
+  for(const k of FOCUS_KEYS){ if(o.indexOf(k)===-1) return false; }
+  return new Set(o).size===6;
+}
+function focusRank(hour, focusOrder){               // 0=최고집중 .. 5=최저, -1=미설정/무효/미커버→폴백
+  if(!isValidFocusOrder(focusOrder)) return -1;
+  const blk=hourToBlock(hour);
+  if(blk==null) return -1;
+  return focusOrder.indexOf(blk);
+}
+function focusLevel(hour, focusOrder){              // 정규화 레벨(테스트·UI), 폴백이면 null
+  const r=focusRank(hour, focusOrder);
+  return r<0 ? null : (5-r)/5;                       // {1.0,0.8,0.6,0.4,0.2,0.0}
+}
+// 그 시각의 기본 energyMode를 정함. 미설정/무효/미커버 → 기존 휴리스틱(불변식 보장).
+function profileMode(hour, focusOrder){
+  const r=focusRank(hour, focusOrder);
+  if(r<0) return timeOfDayMode(hour);
+  if(r<=1) return 'focus';                           // 상위 2블록
+  if(r>=4) return 'light';                           // 하위 2블록
+  return null;                                        // 중간 2블록 = 중립
+}
 function suggestScore(t,gap,opts={}){
   // 가중치 합=1. opts.energyMode 미설정이면 energyFit=0.6 상수 → new=0.85*old+0.09 아핀변환(정렬 불변).
   const score = 0.323*prioScore(t) + 0.3145*urgencyScore(t) + 0.2125*fitScore(t,gap) + 0.15*energyFit(t.weight, opts.energyMode);
