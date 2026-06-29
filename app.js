@@ -493,7 +493,7 @@
     const wrap=el(`<div class="memo-editor">
       <div class="memo-editor-head">
         <div class="memo-head-left">
-          <button class="btn sm" id="memoBack">${cic('plus')} 메모 목록</button>
+          <button class="btn sm" id="memoBack" aria-label="메모 목록으로">${cic('back')} 메모 목록</button>
           <span class="memo-saved" id="memoSaved" aria-live="polite"></span>
         </div>
         <button class="btn sm" id="memoDel" style="color:var(--p1)">삭제</button>
