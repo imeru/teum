@@ -103,7 +103,7 @@
     if(ev.freq==='once'){ const end=ev.endDate||ev.startDate; return ds>=ev.startDate && ds<=end; }
     if(ds<ev.startDate) return false;
     if(ev.endMode==='date'&&ev.endDate&&ds>ev.endDate) return false;
-    if(ev.excludeHolidays&&(state.holidays||[]).includes(ds)) return false;
+    if(ev.excludeHolidays&&holidayName(ds)) return false; // 국경일(KR_HOLIDAY_NAMES 자동·연도무관)+사용자 휴무일(state.holidays)
     const target=new Date(ds+'T00:00:00'), startD=new Date(ev.startDate+'T00:00:00');
     const interval=ev.interval||1;
     if((ev.freq||'weekly')==='weekly'){
@@ -209,6 +209,13 @@
     content.innerHTML='';
     // 완료 뷰는 보관 목적이라 빠른 추가 바를 두지 않음
     if(currentView!=='done') content.appendChild(quickAddBar());
+    // 프로젝트 뷰: 삭제 액션(할 일은 보존, 연결만 해제)
+    if(currentFilter&&currentFilter.type==='project'){
+      const pid=currentFilter.value;
+      const bar=el(`<div class="view-actions" style="display:flex;justify-content:flex-end;margin:-6px 0 12px"><button class="btn sm ghost" id="projDelBtn" style="color:var(--muted)">${cic('trash')} 프로젝트 삭제</button></div>`);
+      bar.querySelector('#projDelBtn').onclick=()=>deleteProject(pid);
+      content.appendChild(bar);
+    }
 
     if(!tasks.length){
       const emptyMsg = currentView==='done' ? '아직 완료한 일이 없습니다.' : '할 일이 없습니다. 위에 입력해 추가하세요.';
@@ -1699,6 +1706,17 @@
   function fillProjectSelect(sel){
     const s=$('#f-project'); s.innerHTML='<option value="">없음</option>';
     state.projects.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(p.id===sel)o.selected=true;s.appendChild(o);});
+    const o=document.createElement('option'); o.value='__new__'; o.textContent='+ 새 프로젝트…'; s.appendChild(o);
+    s.dataset.prev = sel||'';
+    s.onchange=()=>{ if(s.value==='__new__') addProjectInline(s); else s.dataset.prev=s.value; };
+  }
+  // 할 일 모달에서 새 프로젝트를 바로 등록(셀렉트의 '+ 새 프로젝트…' 선택 시)
+  function addProjectInline(s){
+    const nm=((typeof window!=='undefined'&&window.prompt&&window.prompt('새 프로젝트 이름'))||'').trim();
+    if(!nm){ s.value=s.dataset.prev||''; return; }
+    let p=state.projects.find(x=>x.name.toLowerCase()===nm.toLowerCase());
+    if(!p){ p={id:uid(),name:nm,color:PROJECT_COLORS[state.projects.length%PROJECT_COLORS.length],updatedAt:Date.now()}; state.projects.push(p); save(); }
+    fillProjectSelect(p.id); // 새 프로젝트 선택 상태로 재구성
   }
   function setPrio(p){ selectedPrio=p; document.querySelectorAll('#prioPick button').forEach(b=>b.classList.toggle('sel',+b.dataset.p===p)); }
   function setWeight(w){ selectedWeight=(w==='light'||w==='focus')?w:null; document.querySelectorAll('#weightPick button').forEach(b=>b.classList.toggle('sel',b.dataset.w===selectedWeight)); }
@@ -1722,10 +1740,13 @@
   function openProject(){
     $('#p-name').value=''; projColor=PROJECT_COLORS[0];
     const wrap=$('#projColors'); wrap.innerHTML='';
-    PROJECT_COLORS.forEach(c=>{const b=el(`<button style="background:${c};flex:0 0 28px;height:28px;border-radius:50%;border:2px solid transparent"></button>`);
-      b.onclick=()=>{projColor=c;document.querySelectorAll('#projColors button').forEach(x=>x.style.borderColor='transparent');b.style.borderColor=getComputedStyle(document.body).color;};
-      if(c===projColor) b.style.borderColor=getComputedStyle(document.body).color;
+    const selColor=getComputedStyle(document.body).color;
+    const clearSwatches=()=>document.querySelectorAll('#projColors button').forEach(x=>x.style.borderColor='transparent');
+    PROJECT_COLORS.forEach(c=>{const b=el(`<button type="button" style="background:${c};flex:0 0 28px;height:28px;border-radius:50%;border:2px solid transparent"></button>`);
+      b.onclick=()=>{projColor=c;clearSwatches();b.style.borderColor=selColor;const ci=$('#p-customColor');if(ci)ci.value=c;};
+      if(c===projColor) b.style.borderColor=selColor;
       wrap.appendChild(b);});
+    const ci=$('#p-customColor'); if(ci){ ci.value=projColor; ci.oninput=()=>{ projColor=ci.value; clearSwatches(); }; }
     $('#projOverlay').classList.add('show');
     setTimeout(()=>$('#p-name').focus(),50);
   }
@@ -1733,6 +1754,18 @@
     const name=$('#p-name').value.trim(); if(!name) return;
     state.projects.push({id:uid(),name,color:projColor,updatedAt:Date.now()}); save();
     $('#projOverlay').classList.remove('show'); render();
+  }
+  // 프로젝트 삭제 — 할 일은 지우지 않고 연결만 해제(projectId=''), 동기화 부활 방지용 tombstone 기록.
+  function deleteProject(pid){
+    const p=state.projects.find(x=>x.id===pid); if(!p) return;
+    const linked=state.tasks.filter(t=>t.projectId===pid).length;
+    const msg=`'${p.name}' 프로젝트를 삭제할까요?`+(linked?`\n연결된 할 일 ${linked}개는 삭제되지 않고 프로젝트 연결만 해제됩니다.`:'');
+    let ok=true; try{ if(typeof confirm==='function') ok=confirm(msg); }catch(e){}
+    if(!ok) return;
+    state.tasks.forEach(t=>{ if(t.projectId===pid){ t.projectId=''; t.updatedAt=Date.now(); } });
+    state.projects=state.projects.filter(x=>x.id!==pid);
+    if(!state.deletions)state.deletions={}; state.deletions[pid]=Date.now(); // tombstone(동기화 병합용)
+    save(); setView('next');
   }
 
   // ---------- 알림 (포그라운드 — 앱이 켜져 있을 때) ----------
@@ -2229,31 +2262,25 @@
   }
   function settingsHolidayCard(){
     const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
-      <strong>${svgIco('cal')} 공휴일 / 휴무일</strong>
-      <div class="note">여기에 등록한 날짜는 '공휴일 제외'를 켠 정기 일정에서 자동으로 빠집니다.</div>
+      <strong>${svgIco('cal')} 휴무일</strong>
+      <div class="note">한국 공휴일은 달력과 '공휴일 제외' 정기 일정에 <b>자동 반영</b>됩니다(매년·연도 무관). 여기에는 회사 휴무·개인 휴가 등 <b>추가 휴무일</b>만 등록하세요.</div>
       <div class="row" style="align-items:flex-end">
-        <div class="field"><label>날짜 추가</label><input id="hol-date" type="date"></div>
+        <div class="field"><label>휴무일 추가</label><input id="hol-date" type="date"></div>
         <button class="btn" id="hol-add">추가</button>
-        <button class="btn" id="hol-kr">올해 한국 공휴일 추가</button>
       </div>
       <div id="hol-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>`);
     const renderHol=()=>{
       const list=card.querySelector('#hol-list'); list.innerHTML='';
-      const hs=(state.holidays||[]).slice().sort();
-      if(!hs.length){ list.appendChild(el(`<div class="note">등록된 날짜가 없습니다.</div>`)); return; }
+      // 자동 처리되는 국경일(KR_HOLIDAY_NAMES)은 숨기고, 사용자가 추가한 휴무일만 표시.
+      const isAuto=d=>!!(KR_HOLIDAY_NAMES[d]||KR_HOLIDAY_NAMES[d.slice(5)]);
+      const hs=(state.holidays||[]).filter(d=>!isAuto(d)).slice().sort();
+      if(!hs.length){ list.appendChild(el(`<div class="note">등록된 추가 휴무일이 없습니다.</div>`)); return; }
       hs.forEach(d=>{ const chip=el(`<span class="chip">${d} <button class="iconbtn" style="padding:0 2px" aria-label="${d} 삭제">✕</button></span>`);
         chip.querySelector('button').onclick=()=>{ state.holidays=state.holidays.filter(x=>x!==d); save(); renderHol(); };
         list.appendChild(chip); });
     };
     card.querySelector('#hol-add').onclick=()=>{ const v=card.querySelector('#hol-date').value; if(v&&!(state.holidays||[]).includes(v)){ if(!state.holidays)state.holidays=[]; state.holidays.push(v); save(); renderHol(); } };
-    card.querySelector('#hol-kr').onclick=()=>{
-      const y=new Date().getFullYear();
-      const list=(KR_HOLIDAYS[y]) || KR_HOLIDAYS_FIXED.map(md=>`${y}-${md}`); // 테이블 없으면 양력 고정일 폴백
-      if(!state.holidays)state.holidays=[];
-      list.forEach(d=>{ if(!state.holidays.includes(d)) state.holidays.push(d); });
-      save(); renderHol();
-    };
     renderHol();
     return card;
   }

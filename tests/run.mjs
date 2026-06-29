@@ -378,27 +378,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('오늘 뷰엔 빠른추가 있음', !!$('#quickInput'));
 }
 
-// ───────────────────────── 14) 한국 공휴일(설·추석·대체공휴일) ─────────────────────────
+// ───────────────────────── 14) 휴무일 / 공휴일 자동 처리 ─────────────────────────
 {
-  section('한국 공휴일');
-  const { $, window, getErr } = boot(baseState());
+  section('휴무일/공휴일');
+  // 국경일은 자동(KR_HOLIDAY_NAMES) → 칩 숨김. 사용자 추가 휴무일만 표시.
+  const { $, $$, window, getErr } = boot(baseState({ holidays: ['2026-08-15', '2026-07-20'] }));
   $('.nav[data-view="settings"]').click();
-  $('#hol-kr').click();
-  const hs = JSON.parse(window.localStorage.getItem('flowdo.state.v1')).holidays;
-  const yr = today.getFullYear();
   ck('런타임 에러 없음', !getErr());
-  if (yr === 2026) {
-    ck('2026 공휴일 17개 추가', hs.length === 17);
-    ck('설날(02-17) 포함', hs.includes('2026-02-17'));
-    ck('추석(09-25) 포함', hs.includes('2026-09-25'));
-    ck('대체공휴일(03-02) 포함', hs.includes('2026-03-02'));
-  } else {
-    ck('폴백: 양력 고정일 8개', hs.length === 8 && hs.includes(`${yr}-01-01`));
-  }
-  // 중복 추가 방지
-  $('#hol-kr').click();
-  const hs2 = JSON.parse(window.localStorage.getItem('flowdo.state.v1')).holidays;
-  ck('재클릭해도 중복 없음', hs2.length === hs.length);
+  ck('한국 공휴일 일괄추가 버튼 제거됨', !$('#hol-kr'));
+  const chips = $$('#hol-list .chip').map(c => c.textContent);
+  ck('국경일(08-15)은 칩에서 숨김(자동 처리)', !chips.some(t => t.includes('2026-08-15')));
+  ck('사용자 휴무일(07-20)은 칩 표시', chips.some(t => t.includes('2026-07-20')));
+  // 휴무일 직접 추가
+  $('#hol-date').value = '2026-11-11';
+  $('#hol-add').click();
+  const hs = JSON.parse(window.localStorage.getItem('flowdo.state.v1')).holidays;
+  ck('휴무일 추가 저장', hs.includes('2026-11-11'));
+  ck('추가 후 칩 표시', $$('#hol-list .chip').some(c => c.textContent.includes('2026-11-11')));
 }
 
 // ───────────────────────── 15) 동기화 병합 (mergeStates) ─────────────────────────
@@ -913,6 +909,60 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('reason 칩 에너지 사유', warm.$$('#sgList .chip.why').some(c => c.textContent.includes('집중할 일')));
   ck('카드 점수 비노출', !/0\.\d{2,}/.test(warm.$('#sgList').textContent));
   ck('런타임 에러 없음(suggest)', !warm.getErr());
+}
+
+// ───────────────────────── 20) 프로젝트: 인라인 생성·사용자 색상·삭제 ─────────────────────────
+{
+  section('프로젝트 관리');
+  // (1) 할 일 편집 모달에서 '+ 새 프로젝트…'로 인라인 생성
+  {
+    const { $, $$, window, getErr } = boot(baseState({
+      tasks: [{ id: 't1', title: '할일1', status: 'next', priority: 3, due: todayDS, tags: [], createdAt: 1, updatedAt: 1 }]
+    }));
+    $('.nav[data-view="today"]').click();
+    $$('.task').find(n => n.textContent.includes('할일1')).querySelector('[data-act="edit"]').click();
+    const sel = $('#f-project');
+    ck('새 프로젝트 옵션 존재', $$('#f-project option').some(o => o.value === '__new__'));
+    window.prompt = () => '인라인프로젝트';
+    sel.value = '__new__';
+    sel.dispatchEvent(new window.Event('change'));
+    const st = JSON.parse(window.localStorage.getItem('flowdo.state.v1'));
+    const np = st.projects.find(p => p.name === '인라인프로젝트');
+    ck('프롬프트 이름으로 프로젝트 생성', !!np);
+    ck('생성된 프로젝트가 선택됨', sel.value === (np && np.id));
+    ck('차분한 팔레트 색 적용', !!np && /^#[0-9a-f]{6}$/i.test(np.color));
+    ck('런타임 에러 없음(인라인)', !getErr());
+  }
+  // (2) 새 프로젝트 모달 — 사용자 지정 색상
+  {
+    const { $, window, getErr } = boot(baseState());
+    $('#addProjectBtn').click();
+    ck('사용자 색상 입력 존재', !!$('#p-customColor'));
+    $('#p-customColor').value = '#123456';
+    $('#p-customColor').dispatchEvent(new window.Event('input'));
+    $('#p-name').value = '커스텀색';
+    $('#projSaveBtn').click();
+    const st = JSON.parse(window.localStorage.getItem('flowdo.state.v1'));
+    const p = st.projects.find(x => x.name === '커스텀색');
+    ck('사용자 지정 색상 저장', !!p && p.color === '#123456');
+    ck('런타임 에러 없음(색상)', !getErr());
+  }
+  // (3) 프로젝트 삭제 — 할 일은 보존(연결 해제)+tombstone
+  {
+    const { $, $$, window, getErr } = boot(baseState({
+      projects: [{ id: 'p1', name: '지울프로젝트', color: '#4f6da3', updatedAt: 1 }],
+      tasks: [{ id: 't1', title: '연결된할일', status: 'next', priority: 3, projectId: 'p1', tags: [], createdAt: 1, updatedAt: 1 }]
+    }));
+    window.confirm = () => true;
+    $$('#projectNav .nav')[0].click();        // 프로젝트 뷰 진입
+    ck('프로젝트 삭제 버튼 노출', !!$('#projDelBtn'));
+    $('#projDelBtn').click();
+    const st = JSON.parse(window.localStorage.getItem('flowdo.state.v1'));
+    ck('프로젝트 제거됨', !st.projects.some(p => p.id === 'p1'));
+    ck('할 일은 보존(연결만 해제)', st.tasks.some(t => t.id === 't1' && !t.projectId));
+    ck('tombstone 기록(동기화 부활 방지)', !!(st.deletions && st.deletions.p1));
+    ck('런타임 에러 없음(삭제)', !getErr());
+  }
 }
 
 // ───────────────────────── 결과 ─────────────────────────

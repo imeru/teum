@@ -498,6 +498,8 @@ input,textarea,select{font-family:inherit}
 .prio-pick button[data-p="1"].sel{background:var(--p1)} .prio-pick button[data-p="2"].sel{background:var(--p2)}
 .prio-pick button[data-p="3"].sel{background:var(--p3)} .prio-pick button[data-p="4"].sel{background:var(--p4)}
 .lbl-hint{color:var(--muted);font-weight:400;font-size:11px}
+.proj-custom-color{display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted);cursor:pointer}
+.proj-custom-color input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer}
 .weight-pick{display:flex;gap:8px}
 .weight-pick button{flex:1;border:1px solid var(--border);background:var(--panel-2);border-radius:10px;padding:8px;font-size:13px;color:var(--muted)}
 .weight-pick button.sel[data-w="light"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
