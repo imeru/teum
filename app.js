@@ -14,6 +14,7 @@
     key: 'sb_publishable_PCfTgna_8CzZBS3F_Gi9AA_y5P-hFUn'
   };
 
+  let localPristine = false; // load()가 갓 시드한 데모 상태인가(편집/저장 전) — 첫 동기화 시 데모 중복 방지용
   let state = load();
   let cloud = loadCfg();
   let currentView = 'today';
@@ -67,7 +68,7 @@
   }
   function load(){
     try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.tasks) return migrate(s); }catch(e){}
-    return defaultState();
+    localPristine=true; return defaultState(); // 저장된 상태 없음 → 데모 시드(편집 전까지 pristine)
   }
   function migrate(s){
     if(!s.sessions) s.sessions=[];
@@ -96,6 +97,7 @@
     return Object.assign({}, DEFAULT_CLOUD, saved);
   }
   function save(){
+    localPristine=false; // 사용자가 편집함 → 더 이상 데모 시드 아님
     state.updatedAt = Date.now();
     localStorage.setItem(LS_KEY, JSON.stringify(state));
     scheduleSync();
@@ -2048,6 +2050,31 @@
     });
   }
 
+  // 동기화로 생긴 중복 정리: 내용이 완전히 같은 항목을 가장 오래된 하나만 남기고 tombstone(다른 기기에도 전파)
+  function dedupeState(){
+    if(!state.deletions) state.deletions={};
+    const dedupe=(arr,keyFn)=>{
+      const firstId={}, removed=[];
+      arr.slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).forEach(x=>{
+        const k=keyFn(x); if(firstId[k]!==undefined) removed.push(x); else firstId[k]=x.id;
+      });
+      const rmSet=new Set(removed.map(x=>x.id));
+      return { kept:arr.filter(x=>!rmSet.has(x.id)), removed, firstId };
+    };
+    const td=dedupe(state.tasks||[], x=>['T',x.title||'',x.status,x.notes||'',(x.tags||[]).join(','),x.due||''].join('|'));
+    const pd=dedupe(state.projects||[], x=>['P',x.name||'',x.color||''].join('|'));
+    const md=dedupe(state.memos||[], x=>['M',x.title||'',x.body||'',x.folderId||''].join('|'));
+    const fd=dedupe(state.folders||[], x=>['F',x.name||''].join('|'));
+    // 제거된 프로젝트를 가리키던 할 일을 유지된 프로젝트로 재매핑
+    const projRemap={}; pd.removed.forEach(r=>{ projRemap[r.id]=pd.firstId[['P',r.name||'',r.color||''].join('|')]; });
+    td.kept.forEach(t=>{ if(t.projectId&&projRemap[t.projectId]) t.projectId=projRemap[t.projectId]; });
+    const removedAll=[...td.removed,...pd.removed,...md.removed,...fd.removed];
+    removedAll.forEach(x=>{ state.deletions[x.id]=Date.now(); });
+    state.tasks=td.kept; state.projects=pd.kept; state.memos=md.kept; state.folders=fd.kept;
+    if(removedAll.length){ save(); render(); }
+    return removedAll.length;
+  }
+
   // ---------- 검색 (할 일 + 메모 교차) ----------
   function searchMatch(q, parts){ return parts.some(p => (p||'').toLowerCase().includes(q)); }
   function renderSearch(){
@@ -2218,13 +2245,16 @@
       <div class="row">
         <button class="btn" id="exp">JSON 내보내기</button>
         <button class="btn" id="imp">JSON 가져오기</button>
+        <button class="btn" id="dedup">중복 정리</button>
         <button class="btn" id="rst" style="color:var(--p1)">초기화</button>
       </div>
+      <div class="note">‘중복 정리’: 제목·내용이 완전히 같은 할 일·메모·프로젝트를 하나만 남기고 정리합니다(동기화로 생긴 중복 제거).</div>
       <input type="file" id="impFile" accept="application/json" style="display:none">
     </div>`);
     card.querySelector('#exp').onclick=exportJson;
     card.querySelector('#imp').onclick=()=>card.querySelector('#impFile').click();
     card.querySelector('#impFile').onchange=importJson;
+    card.querySelector('#dedup').onclick=()=>{ const n=dedupeState(); toast(n?`중복 ${n}개를 정리했습니다.`:'중복 항목이 없습니다.'); };
     card.querySelector('#rst').onclick=()=>{ if(confirm('모든 로컬 데이터를 초기화할까요?')){ state=defaultState(); save(); render(); } };
     return card;
   }
@@ -2326,6 +2356,9 @@
       if(error) throw error;
       if(data&&data.data){
         const remote=migrate(data.data);
+        // 갓 시드된 데모 상태(편집 전)면 병합하지 않고 서버로 '교체' — 데모 데이터가 기기마다 합쳐져
+        // 중복 생기는 것을 방지(데모는 보존할 사용자 데이터가 아님).
+        if(localPristine){ state=remote; localPristine=false; lastSyncSig=syncSig(); localStorage.setItem(LS_KEY,JSON.stringify(state)); render(); if(manual) toast('서버에서 불러왔습니다.'); return; }
         // 게이트를 updated_at 비교가 아니라 '내용 차이'로 — mergeStates가 항목별 충돌 안전 병합이라
         // 로컬 updatedAt이 더 커도(다른 항목을 최근 수정) 원격의 다른 변경을 병합해야 함.
         if(!manual && sigOf(remote)===sigOf(state)){ lastSyncSig=syncSig(); return; }

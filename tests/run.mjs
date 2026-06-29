@@ -770,6 +770,37 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('메모 결과 클릭 → 메모 뷰', $('#viewTitle').textContent === '메모');
 }
 
+// ───────────────────────── 중복 정리 ─────────────────────────
+{
+  section('중복 정리');
+  const { $, getErr } = boot(baseState({
+    tasks: [
+      { id: 'a1', title: '연구 미팅 자료 정리', status: 'next', priority: 2, notes: '', tags: ['@연구'], due: null, createdAt: 100, updatedAt: 1 },
+      { id: 'a2', title: '연구 미팅 자료 정리', status: 'next', priority: 2, notes: '', tags: ['@연구'], due: null, createdAt: 200, updatedAt: 1 },
+      { id: 'a3', title: '고유 할일', status: 'next', priority: 3, notes: '', tags: [], due: null, createdAt: 300, updatedAt: 1 },
+    ],
+    projects: [
+      { id: 'p1', name: '논문 투고', color: '#4f46e5', createdAt: 100 },
+      { id: 'p2', name: '논문 투고', color: '#4f46e5', createdAt: 200 },
+    ],
+    memos: [
+      { id: 'mm1', title: '캠핑', body: '가스', color: '', createdAt: 100, updatedAt: 1 },
+      { id: 'mm2', title: '캠핑', body: '가스', color: '', createdAt: 200, updatedAt: 1 },
+    ],
+  }));
+  // p2를 가리키는 할 일이 있다고 가정하고 재매핑 확인용으로 a3에 p2 부여
+  const st0 = JSON.parse(localStorage.getItem('flowdo.state.v1')); st0.tasks[2].projectId = 'p2'; localStorage.setItem('flowdo.state.v1', JSON.stringify(st0));
+  $('.nav[data-view="settings"]').click();
+  $('#dedup').click();
+  const st = JSON.parse(localStorage.getItem('flowdo.state.v1'));
+  ck('런타임 에러 없음', !getErr());
+  ck('할 일 중복 제거(2→1 + 고유1 = 2)', st.tasks.length === 2);
+  ck('프로젝트 중복 제거(2→1)', st.projects.length === 1);
+  ck('메모 중복 제거(2→1)', st.memos.length === 1);
+  ck('제거 항목 tombstone 기록', !!(st.deletions && (st.deletions.a2 || st.deletions.p2 || st.deletions.mm2)));
+  ck('제거된 프로젝트 참조 재매핑', !st.tasks.some(t => t.projectId === 'p2'));
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
