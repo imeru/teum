@@ -904,6 +904,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   warm.$('.nav[data-view="suggest"]').click();
   ck('energyChips 노출', !!warm.$('#energyChips'));
   ck('energyChips 2버튼', warm.$$('#energyChips button').length === 2);
+  // 시각 무관 결정성: timeOfDayMode가 이미 focus를 기본 선택했으면(예: 오전) 먼저 light로 옮긴 뒤 focus를 '진짜로' 선택.
+  if (warm.$('#energyChips button[data-w="focus"]').classList.contains('sel')) warm.$('#energyChips button[data-w="light"]').click();
   warm.$('#energyChips button[data-w="focus"]').click();
   ck('energyChips 클릭 선택', warm.$('#energyChips button[data-w="focus"]').classList.contains('sel'));
   ck('reason 칩 에너지 사유', warm.$$('#sgList .chip.why').some(c => c.textContent.includes('집중할 일')));
