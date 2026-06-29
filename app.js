@@ -154,7 +154,7 @@
 
   // ---------- Views ----------
   const VIEWS = {
-    today:{title:'오늘', sub:'오늘 마감·예정된 행동', filter:t=>!isDone(t)&&(t.due===todayStr()||isOverdue(t.due)||(t.block&&t.block.date===todayStr()))},
+    today:{title:'오늘 할 일', sub:'오늘 마감·예정된 행동', filter:t=>!isDone(t)&&(t.due===todayStr()||isOverdue(t.due)||(t.block&&t.block.date===todayStr()))},
     inbox:{title:'Inbox', sub:'수집함 — 분류가 필요한 항목', filter:t=>!isDone(t)&&t.status==='inbox'},
     next:{title:'다음 할일', sub:'바로 실행할 수 있는 일', filter:t=>!isDone(t)&&t.status==='next'},
     waiting:{title:'대기 중', sub:'다른 사람·조건을 기다리는 일', filter:t=>!isDone(t)&&t.status==='waiting'},
@@ -2079,12 +2079,13 @@
     localStorage.setItem('flowdo.guideSeen','1');
     const steps=[
       {n:'1', t:'담기 (Capture)', d:'떠오르는 모든 걸 Inbox로. 머릿속을 비우는 게 먼저예요.', view:'gtdboard', btn:'GTD 보드 열기'},
-      {n:'2', t:'분류 (Clarify)', d:'Inbox를 다음 할일·대기 중·언젠가로 끌어 정리. 2분이면 되는 일은 바로 처리.', view:'gtdboard', btn:'GTD 보드 열기'},
-      {n:'3', t:'소요시간 (Estimate)', d:'할 일에 예상 소요(분)를 적어요. 이게 추천·타임블록의 연료가 됩니다.', view:null},
-      {n:'4', t:'배치 (Schedule)', d:'타임박스에서 할 일을 시간표로 드래그. 오늘의 TOP 3를 먼저 정하세요.', view:'plan', btn:'타임박스 열기'},
-      {n:'5', t:'집중 (Focus)', d:'빈 시간이 생기면 “지금 이 틈”에서 딱 맞는 일을 골라 집중.', view:'suggest', btn:'지금 이 틈 열기'},
-      {n:'6', t:'완료 (Complete)', d:'체크해서 진전을 확인. 큰 일은 체크리스트로 나눠 ☑ 진행을 봅니다.', view:null},
-      {n:'7', t:'돌아보기 (Reflect)', d:'하루는 일일 리뷰로, 한 주는 주간 리뷰로 닫고 다음을 준비하세요.', view:'weekreview', btn:'주간 리뷰 열기'},
+      {n:'2', t:'분류 (Clarify)', d:'GTD 보드에서 Inbox를 다음 할일·대기중(위임)·언젠가로 끌어 정리. 2분이면 되는 일은 바로 처리.', view:'gtdboard', btn:'GTD 보드 열기'},
+      {n:'3', t:'오늘 고르기 (Today)', d:'다음 할일 중 오늘 할 것에 ‘오늘’을 지정하세요(사이드바 ‘오늘 할 일’이나 주간 스트립의 오늘 칸으로 드래그). 그러면 타임박스 왼쪽 ‘오늘 할 일’에 모여요. ‘오늘’은 GTD 상태가 아니라 마감일 표시예요.', view:'today', btn:'오늘 할 일 열기'},
+      {n:'4', t:'소요시간 (Estimate)', d:'할 일에 예상 소요(분)를 적어요. 타임블록 길이와 “지금 이 틈” 추천의 연료가 됩니다.', view:null},
+      {n:'5', t:'배치 (Timebox)', d:'‘오늘 할 일’을 시간표로 드래그해 언제 할지 정하세요. 가장 중요한 3개는 TOP 3 슬롯에 올리고요. — 시간이 작업보다 먼저.', view:'plan', btn:'타임박스 열기'},
+      {n:'6', t:'집중 (Focus)', d:'빈 시간이 생기면 “지금 이 틈”에서 딱 맞는 일을 골라 집중. 끝낸 일은 캘린더에서 바로 체크해 지워요.', view:'suggest', btn:'지금 이 틈 열기'},
+      {n:'7', t:'완료 (Complete)', d:'체크해서 진전을 확인. 큰 일은 체크리스트로 나눠 ☑ 진행을 봅니다.', view:null},
+      {n:'8', t:'돌아보기 (Reflect)', d:'하루는 일일 리뷰로, 한 주는 주간 리뷰로 닫고 다음을 준비하세요.', view:'weekreview', btn:'주간 리뷰 열기'},
     ];
     const box=el(`<div class="guide">
       <div class="guide-hero">

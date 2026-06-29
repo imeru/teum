@@ -265,7 +265,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   section('홈/마지막화면');
   // 첫 실행(저장된 화면 없음) → 오늘
   const a = boot(baseState());
-  ck('첫 실행 홈=오늘', a.$('#viewTitle').textContent === '오늘');
+  ck('첫 실행 홈=오늘', a.$('#viewTitle').textContent === '오늘 할 일');
   // 마지막 본 화면이 타임박스면 그걸로 복원
   const b = boot(baseState(), { lastview: 'plan' });
   ck('마지막=타임박스면 복원', b.$('#viewTitle').textContent === '타임박스');
@@ -328,11 +328,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('가이드 본 표시 저장', first.window.localStorage.getItem('flowdo.guideSeen') === '1');
   // 사이드바에 가이드 메뉴
   ck('사이드바 가이드 메뉴', !!first.$('.nav[data-view="guide"]'));
-  ck('워크플로 7단계 렌더', first.$$('.guide-step').length === 7);
+  ck('워크플로 8단계 렌더', first.$$('.guide-step').length === 8);
   ck('바로가기 버튼 존재', first.$$('.guide-step .btn').length >= 1);
   // 두 번째 실행(guideSeen 있음)은 가이드 자동 표시 안 함 → 오늘
   const second = boot(baseState());
-  ck('두 번째 실행은 오늘', second.$('#viewTitle').textContent === '오늘');
+  ck('두 번째 실행은 오늘', second.$('#viewTitle').textContent === '오늘 할 일');
   // 가이드는 lastview로 저장되지 않음(전환해도 reload 시 작업화면 복귀)
   second.$('.nav[data-view="guide"]').click();
   ck('가이드는 lastview 미저장', second.window.localStorage.getItem('flowdo.lastview') !== 'guide');
