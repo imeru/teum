@@ -43,13 +43,8 @@
 
   function defaultState(){
     return {
-      tasks: [
-        demo('연구 미팅 자료 정리', 'next', 2, ['@연구'], todayStr()),
-        demo('이메일 회신 (학과)', 'inbox', 3, ['@행정'], null),
-        demo('논문 리비전 아이디어 메모', 'someday', 4, ['@연구'], null),
-        demo('공동연구자 회신 대기', 'waiting', 3, [], null),
-      ],
-      projects: [{id:uid(), name:'논문 투고', color:PROJECT_COLORS[0]}],
+      tasks: [],       // 빈 상태로 시작 — 온보딩은 '사용 가이드'(첫 실행 자동)와 빈 화면 안내가 담당
+      projects: [],
       sessions: [],
       settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5 },
       top3: {},
@@ -61,10 +56,6 @@
       deletions: {},   // {id: deletedAt} — 동기화 병합 시 삭제 보존(tombstone)
       updatedAt: Date.now()
     };
-  }
-  function demo(title,status,prio,tags,due){
-    return {id:uid(),title,notes:'',status,priority:prio,tags,due,projectId:'',
-      block:null,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null};
   }
   function load(){
     try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.tasks) return migrate(s); }catch(e){}
