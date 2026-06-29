@@ -1174,7 +1174,7 @@
     const dated=sortTasks(avail.filter(isDatedFor).concat(doneDated));
     const undated=sortTasks(avail.filter(t=>!isDatedFor(t)));
     addPoolGroup(pool, planDate===todayStr()?'오늘 할 일':'예정 할 일', dated);
-    addPoolGroup(pool,'기본 할 일', undated);
+    addPoolGroup(pool,'다음 할 일 (GTD)', undated);
     if(!avail.length){
       const inboxN=countFor(t=>!isDone(t)&&t.status==='inbox');
       const msg=inboxN ? `배치할 ‘다음 할일’이 없습니다. GTD 보드에서 Inbox ${inboxN}개를 ‘다음 할일’로 분류하면 여기 나타나요.`
