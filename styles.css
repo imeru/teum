@@ -5,6 +5,7 @@
   --text:#16242f; --muted:#7e8a90; --accent:#16324a; --accent-soft:#e9edf0; --on-accent:#ffffff; --sage:#83bfa7;
   --p1:#c97a16; --p2:#b8924a; --p3:#5f93a6; --p4:#aeb6b6;
   --green:#4f9b76; --red:#d2483f; --amber:#c98a1a;
+  --focus:#3f6fa3;  /* 집중(에너지) — 의미 색 단일 파랑 */
   --sun:#c4524a; --sat:#3f6fa3;  /* 일·공휴일 / 토요일 (차분한 톤) */
   --shadow:0 1px 2px rgba(30,33,38,.04),0 6px 20px rgba(30,33,38,.05);
   --radius:14px;
@@ -15,6 +16,7 @@
     --p1:#d59446; --p2:#c2a060; --p3:#8fa3b8; --p4:#5d5e66;
     --green:#5fae82; --red:#e15a52; --amber:#d6a13a;
     --sun:#e0726a; --sat:#7aa3d6;
+    --focus:#7aa3d6;
     --shadow:0 1px 2px rgba(0,0,0,.2),0 6px 20px rgba(0,0,0,.25); }
 }
 *{box-sizing:border-box}
@@ -405,6 +407,14 @@ input,textarea,select{font-family:inherit}
 .sg-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
 .chip.why{background:var(--accent-soft);color:var(--accent);border-color:transparent;font-weight:600}
 .sg-actions{display:flex;gap:6px;flex-shrink:0}
+/* 에너지/집중도 토글 ('지금 이 틈') — 집중=파랑 단일 의미색 */
+.energy-pick{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.energy-pick .q{font-size:14px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.energy-hint{font-size:11px;font-weight:400;color:var(--muted)}
+.energy-chips{display:flex;gap:8px;flex-wrap:wrap}
+.energy-chips button{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:22px;padding:8px 16px;font-size:13px;font-weight:600}
+.energy-chips button.sel[data-w="light"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.energy-chips button.sel[data-w="focus"]{background:var(--focus);border-color:var(--focus);color:#fff}
 
 /* Daily review (일일 리뷰) */
 .review{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
@@ -487,6 +497,11 @@ input,textarea,select{font-family:inherit}
 .prio-pick button.sel{color:#fff;border-color:transparent}
 .prio-pick button[data-p="1"].sel{background:var(--p1)} .prio-pick button[data-p="2"].sel{background:var(--p2)}
 .prio-pick button[data-p="3"].sel{background:var(--p3)} .prio-pick button[data-p="4"].sel{background:var(--p4)}
+.lbl-hint{color:var(--muted);font-weight:400;font-size:11px}
+.weight-pick{display:flex;gap:8px}
+.weight-pick button{flex:1;border:1px solid var(--border);background:var(--panel-2);border-radius:10px;padding:8px;font-size:13px;color:var(--muted)}
+.weight-pick button.sel[data-w="light"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.weight-pick button.sel[data-w="focus"]{background:var(--focus);border-color:var(--focus);color:#fff;font-weight:600}
 .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
 .seg{display:flex;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:3px}
 .seg button{border:none;background:none;color:var(--muted);padding:6px 12px;border-radius:8px;font-size:13px}

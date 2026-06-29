@@ -801,6 +801,120 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('제거된 프로젝트 참조 재매핑', !st.tasks.some(t => t.projectId === 'p2'));
 }
 
+// ───────────────────────── 에너지/집중도 기반 추천 ─────────────────────────
+{
+  section('에너지·집중도 추천');
+  const { window: w, getErr } = boot(baseState());
+  ck('런타임 에러 없음', !getErr());
+  // energyFit 매핑
+  ck('energyFit 모드없음=0.6', w.energyFit('light', null) === 0.6 && w.energyFit('focus', undefined) === 0.6 && w.energyFit(null, null) === 0.6);
+  ck('energyFit light모드', w.energyFit('light', 'light') === 1.0 && w.energyFit('focus', 'light') === 0.2 && w.energyFit(null, 'light') === 0.6);
+  ck('energyFit focus모드', w.energyFit('focus', 'focus') === 1.0 && w.energyFit('light', 'focus') === 0.2 && w.energyFit(null, 'focus') === 0.6);
+  // 정규화 가중 합=1 (모든 항 1.0 → 점수 1.0)
+  const full = w.suggestScore({ priority: 1, due: plusDays(-1), estimate: 60, weight: 'focus' }, 30, { energyMode: 'focus' });
+  ck('정규화 가중 합=1 (점수 1.0)', Math.abs(full.score - 1) < 1e-9);
+  // 불변식: energyMode 미설정이면 new=0.85*old+0.09 아핀변환
+  const cases = [
+    { id: 'o1', priority: 1, due: plusDays(-2), estimate: 30, weight: 'focus' },
+    { id: 'o2', priority: 3, due: plusDays(1), estimate: 10, weight: 'light' },
+    { id: 'o3', priority: 4, due: null, estimate: null, weight: null },
+    { id: 'o4', priority: 2, due: plusDays(5), estimate: 25, weight: 'focus' },
+    { id: 'o5', priority: 3, due: plusDays(0), estimate: 60, weight: null },
+  ];
+  const oldScore = t => 0.38 * w.prioScore(t) + 0.37 * w.urgencyScore(t) + 0.25 * w.fitScore(t, 30);
+  const affineOk = cases.every(t => Math.abs(w.suggestScore(t, 30).score - (0.85 * oldScore(t) + 0.09)) < 1e-9);
+  ck('아핀변환 new=0.85*old+0.09', affineOk);
+  const orderNew = cases.slice().sort((a, b) => w.suggestScore(b, 30).score - w.suggestScore(a, 30).score).map(t => t.id).join(',');
+  const orderOld = cases.slice().sort((a, b) => oldScore(b) - oldScore(a)).map(t => t.id).join(',');
+  ck('energyMode 미설정 정렬 기존과 동일', orderNew === orderOld);
+  // reason: 에너지 사유는 마감/우선순위 사유가 없을 때만
+  ck('reason 가벼운 일', w.suggestScore({ priority: 4, due: null, weight: 'light' }, 30, { energyMode: 'light' }).reason === '가벼운 일');
+  ck('reason 집중할 일', w.suggestScore({ priority: 4, due: null, weight: 'focus' }, 30, { energyMode: 'focus' }).reason === '집중할 일');
+  ck('reason 마감 우선(에너지 무시)', w.suggestScore({ priority: 4, due: plusDays(-1), weight: 'light' }, 30, { energyMode: 'light' }).reason === '지난 마감');
+  ck('reason 모드 불일치는 틈에 적합', w.suggestScore({ priority: 4, due: null, weight: 'focus' }, 30, { energyMode: 'light' }).reason === '틈에 적합');
+  // timeOfDayMode 경계
+  ck('timeOfDayMode 오전 focus', w.timeOfDayMode(6) === 'focus' && w.timeOfDayMode(9) === 'focus' && w.timeOfDayMode(11) === 'focus');
+  ck('timeOfDayMode 오후 light', w.timeOfDayMode(13) === 'light' && w.timeOfDayMode(16) === 'light');
+  ck('timeOfDayMode 저녁 light', w.timeOfDayMode(21) === 'light' && w.timeOfDayMode(23) === 'light');
+  ck('timeOfDayMode 그 외 null', w.timeOfDayMode(5) === null && w.timeOfDayMode(12) === null && w.timeOfDayMode(18) === null && w.timeOfDayMode(0) === null);
+  // mergeStates 무영향: weight는 id별 최신 task 객체를 따라감
+  let mg = w.mergeStates(
+    { tasks: [{ id: 'T', title: 'x', weight: 'focus', updatedAt: 5 }], updatedAt: 10 },
+    { tasks: [{ id: 'T', title: 'x', weight: 'light', updatedAt: 9 }], updatedAt: 20 });
+  ck('mergeStates: weight 최신 task 따라감', mg.tasks.find(t => t.id === 'T').weight === 'light');
+}
+
+// migrate: weight 정규화 (가져오기 경로로 저장까지 검증)
+{
+  section('에너지 migrate');
+  const { window: w, $, getErr } = boot(baseState());
+  $('.nav[data-view="settings"]').click();
+  const old = {
+    tasks: [
+      { id: 'nw', title: '무가중', status: 'next', priority: 2 },
+      { id: 'bad', title: '잘못된값', status: 'next', priority: 2, weight: 'heavy' },
+      { id: 'ok', title: '집중', status: 'next', priority: 2, weight: 'focus' },
+    ], projects: [], sessions: [], settings: { focus: 25, short: 5, long: 15, longEvery: 4 }, top3: {}, updatedAt: 5,
+  };
+  const file = new w.File([JSON.stringify(old)], 'wt.json', { type: 'application/json' });
+  const input = $('#impFile');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new w.Event('change'));
+  await sleep(40);
+  ck('런타임 에러 없음', !getErr());
+  const st = JSON.parse(w.localStorage.getItem('flowdo.state.v1'));
+  ck('migrate: weight 미설정→null', st.tasks.find(t => t.id === 'nw').weight === null);
+  ck('migrate: 잘못된 weight→null', st.tasks.find(t => t.id === 'bad').weight === null);
+  ck('migrate: 유효 weight 보존', st.tasks.find(t => t.id === 'ok').weight === 'focus');
+}
+
+// UI 스모크: weightPick 모달 + energyChips 게이트
+{
+  section('에너지 UI');
+  // 1) 모달 weightPick 저장/해제
+  const r3 = boot(baseState());
+  r3.$('#newTaskBtn').click();
+  ck('weightPick 2버튼', r3.$$('#weightPick button').length === 2);
+  r3.$('#f-title').value = '가중치 테스트';
+  r3.$('#weightPick button[data-w="focus"]').click();
+  ck('weightPick 클릭 선택', r3.$('#weightPick button[data-w="focus"]').classList.contains('sel'));
+  r3.$('#taskSaveBtn').click();
+  const st3 = JSON.parse(r3.window.localStorage.getItem('flowdo.state.v1'));
+  ck('saveTask: weight 저장', st3.tasks.find(t => t.title === '가중치 테스트').weight === 'focus');
+  r3.$('#newTaskBtn').click();
+  r3.$('#weightPick button[data-w="light"]').click();
+  r3.$('#weightPick button[data-w="light"]').click();
+  ck('weightPick 재클릭 해제(null)', !r3.$('#weightPick button[data-w="light"]').classList.contains('sel'));
+  // 2) openTask: 기존 weight 로드
+  const r4 = boot(baseState({ tasks: [{ id: 'wt', title: '집중작업', status: 'next', priority: 2, weight: 'focus', due: todayDS, tags: [], createdAt: 1, updatedAt: 1 }] }));
+  r4.$('.nav[data-view="today"]').click();
+  r4.$('.task-title').click();
+  ck('openTask: 기존 weight 로드', r4.$('#weightPick button[data-w="focus"]').classList.contains('sel'));
+  ck('런타임 에러 없음(modal)', !r4.getErr());
+  // 3) cold-start 게이트: 가중 task 없으면 energyChips 비노출
+  const cold = boot(baseState({ tasks: [
+    { id: 'a', title: 't1', status: 'next', priority: 3, tags: [], createdAt: 1, updatedAt: 1 },
+    { id: 'b', title: 't2', status: 'next', priority: 3, tags: [], createdAt: 2, updatedAt: 1 },
+    { id: 'c', title: 't3', status: 'next', priority: 3, tags: [], createdAt: 3, updatedAt: 1 },
+  ] }));
+  cold.$('.nav[data-view="suggest"]').click();
+  ck('cold-start: energyChips 비노출', !cold.$('#energyChips'));
+  // 4) 가중 task 충분 → energyChips 노출 + 상호작용 + reason 칩
+  const warm = boot(baseState({ tasks: [
+    { id: 'a', title: '가벼움a', status: 'next', priority: 3, weight: 'light', tags: [], createdAt: 1, updatedAt: 1 },
+    { id: 'b', title: '집중b', status: 'next', priority: 3, weight: 'focus', tags: [], createdAt: 2, updatedAt: 1 },
+    { id: 'c', title: '중립c', status: 'next', priority: 3, tags: [], createdAt: 3, updatedAt: 1 },
+  ] }));
+  warm.$('.nav[data-view="suggest"]').click();
+  ck('energyChips 노출', !!warm.$('#energyChips'));
+  ck('energyChips 2버튼', warm.$$('#energyChips button').length === 2);
+  warm.$('#energyChips button[data-w="focus"]').click();
+  ck('energyChips 클릭 선택', warm.$('#energyChips button[data-w="focus"]').classList.contains('sel'));
+  ck('reason 칩 에너지 사유', warm.$$('#sgList .chip.why').some(c => c.textContent.includes('집중할 일')));
+  ck('카드 점수 비노출', !/0\.\d{2,}/.test(warm.$('#sgList').textContent));
+  ck('런타임 에러 없음(suggest)', !warm.getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

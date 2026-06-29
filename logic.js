@@ -23,8 +23,22 @@ function urgencyScore(t){
 }
 function prioScore(t){ return ({1:1,2:0.75,3:0.5,4:0.3})[t.priority]||0.3; }
 function fitScore(t,gap){ return t.estimate ? Math.min(1, t.estimate/gap) : 0.45; } // 미입력=중립
-function suggestScore(t,gap){
-  const score = 0.38*prioScore(t) + 0.37*urgencyScore(t) + 0.25*fitScore(t,gap);
+// 에너지/집중도 적합도: 모드 미설정(null/undefined)→0.6 전역중립. 모드와 task.weight 일치=1.0, 반대=0.2, 중립(null)=0.6.
+function energyFit(weight, mode){
+  if(mode!=='light'&&mode!=='focus') return 0.6;       // 모드 미설정 → 중립
+  if(weight!=='light'&&weight!=='focus') return 0.6;   // task 중립
+  return weight===mode ? 1.0 : 0.2;
+}
+// 시간대 기본 모드(순수): 오전 집중, 이른 오후·늦은 저녁 가벼움, 그 외 중립(null).
+function timeOfDayMode(hour){
+  if(hour>=6&&hour<=11) return 'focus';
+  if(hour>=13&&hour<=16) return 'light';
+  if(hour>=21&&hour<=23) return 'light';
+  return null;
+}
+function suggestScore(t,gap,opts={}){
+  // 가중치 합=1. opts.energyMode 미설정이면 energyFit=0.6 상수 → new=0.85*old+0.09 아핀변환(정렬 불변).
+  const score = 0.323*prioScore(t) + 0.3145*urgencyScore(t) + 0.2125*fitScore(t,gap) + 0.15*energyFit(t.weight, opts.energyMode);
   const d=daysUntil(t.due);
   let reason;
   if(d!=null&&d<0) reason='지난 마감';
@@ -32,6 +46,7 @@ function suggestScore(t,gap){
   else if(t.priority<=2) reason='높은 우선순위';
   else if(t.estimate&&t.estimate/gap>=0.7) reason='딱 맞는 시간';
   else if(d!=null&&d<=3) reason='마감 임박';
+  else if((opts.energyMode==='light'||opts.energyMode==='focus')&&opts.energyMode===t.weight) reason=t.weight==='light'?'가벼운 일':'집중할 일';
   else reason='틈에 적합';
   return {score,reason};
 }

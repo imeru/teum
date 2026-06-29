@@ -8,6 +8,7 @@ TEUM_Product_Documentation/
 
 # 의존성 (테스트용 jsdom 등)
 node_modules/
+node_modules
 package-lock.json
 
 # 에디터 / 임시

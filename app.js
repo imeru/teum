@@ -25,6 +25,7 @@
   let memoFolderId = 'all'; // 메모 뷰에서 선택된 폴더: 'all' | 'trash' | folderId
   let memoDragId = null;    // 드래그 중인 메모 id (폴더로 끌어 이동)
   let selectedPrio = 4;
+  let selectedWeight = null; // 에너지/집중도: 'light'|'focus'|null
   let projColor = PROJECT_COLORS[0];
   let supa = null;          // supabase client
   let syncTimer = null;
@@ -75,6 +76,7 @@
       if(ev.excludeHolidays===undefined) ev.excludeHolidays=false;
     });
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
+    (s.tasks||[]).forEach(t=>{ if(t.weight!=='light'&&t.weight!=='focus') t.weight=null; }); // 에너지/집중도 가중치 정규화
     if(!s.weekNotes) s.weekNotes={};
     if(!Array.isArray(s.memos)) s.memos=[];
     if(!Array.isArray(s.folders)) s.folders=[];
@@ -1686,6 +1688,7 @@
     $('#f-tags').value=t?(t.tags||[]).join(', '):(currentFilter&&currentFilter.type==='tag'?currentFilter.value:'');
     $('#f-estimate').value=t?(t.estimate||''):'';
     setPrio(t?t.priority:4);
+    setWeight(t?(t.weight||null):null);
     $('#f-blockdate').value=t&&t.block?t.block.date:'';
     $('#f-blockstart').value=t&&t.block?minToHHMM(t.block.start):'';
     $('#f-blockdur').value=t&&t.block?t.block.duration:'';
@@ -1698,6 +1701,7 @@
     state.projects.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(p.id===sel)o.selected=true;s.appendChild(o);});
   }
   function setPrio(p){ selectedPrio=p; document.querySelectorAll('#prioPick button').forEach(b=>b.classList.toggle('sel',+b.dataset.p===p)); }
+  function setWeight(w){ selectedWeight=(w==='light'||w==='focus')?w:null; document.querySelectorAll('#weightPick button').forEach(b=>b.classList.toggle('sel',b.dataset.w===selectedWeight)); }
   function saveTask(){
     const title=$('#f-title').value.trim(); if(!title){ $('#f-title').focus(); return; }
     const tags=$('#f-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
@@ -1707,7 +1711,7 @@
     const due=$('#f-due').value||null;
     const subtasks=editSubtasks.filter(s=>s.title.trim()).map(s=>({id:s.id,title:s.title.trim(),done:!!s.done}));
     const data={title,notes:$('#f-notes').value.trim(),status:$('#f-status').value,
-      projectId:$('#f-project').value,due,dueTime:due?($('#f-duetime').value||null):null,tags,priority:selectedPrio,
+      projectId:$('#f-project').value,due,dueTime:due?($('#f-duetime').value||null):null,tags,priority:selectedPrio,weight:selectedWeight,
       estimate:(+$('#f-estimate').value||null),block,subtasks};
     if(editingId){ const t=state.tasks.find(x=>x.id===editingId); Object.assign(t,data); t.updatedAt=Date.now(); }
     else { state.tasks.push({id:uid(),...data,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null}); }
@@ -1789,6 +1793,8 @@
   // 추천 점수(suggestScore 등)는 logic.js
   let suggestMin = 15;
   const GAP_OPTS = [5,10,15,30,60];
+  let energyMode = null;     // 사용자가 고른 에너지 모드(비영속) 'light'|'focus'|null
+  let energyTouched = false; // 사용자가 직접 골랐는가(시간대 기본 표시와 구분)
   function renderSuggest(){
     $('#viewTitle').textContent='지금 이 틈';
     $('#viewSub').textContent='지금 가진 시간으로 할 수 있는 가장 좋은 일';
@@ -1809,8 +1815,29 @@
     custom.onchange=()=>{ const v=+custom.value; if(v>0){ suggestMin=v; renderSuggest(); } };
     chips.appendChild(custom);
 
+    // 에너지/집중도 토글(비영속). cold-start 게이트: weight 설정 task가 임계 미만이면 #energyChips 비노출.
+    const eligPool=state.tasks.filter(t=>!isDone(t)&&t.status==='next');
+    const weighted=eligPool.filter(t=>t.weight==='light'||t.weight==='focus');
+    const energyAvail = weighted.length>=2 || (eligPool.length>0 && weighted.length>=1 && weighted.length/eligPool.length>=0.3);
+    const timeMode=timeOfDayMode(new Date().getHours());
+    const effMode = energyAvail ? (energyTouched?energyMode:timeMode) : null;
+    if(energyAvail){
+      const ep=el(`<div class="energy-pick" id="energyPick">
+        <div class="q">${svgIco('pomo')} 지금 컨디션은? <span class="energy-hint" id="energyHint"></span></div>
+        <div class="energy-chips" id="energyChips"></div>
+      </div>`);
+      wrap.querySelector('.gap-pick').after(ep);
+      const ec=ep.querySelector('#energyChips');
+      [['light','가벼운 일'],['focus','집중할 일']].forEach(([w,label])=>{
+        const b=el(`<button class="${effMode===w?'sel':''}" data-w="${w}">${label}</button>`);
+        b.onclick=()=>{ energyTouched=true; energyMode=(effMode===w?null:w); renderSuggest(); };
+        ec.appendChild(b);
+      });
+      if(!energyTouched && timeMode) ep.querySelector('#energyHint').textContent='이 시간대 추천';
+    }
+
     const cands=state.tasks.filter(t=>!isDone(t)&&t.status==='next'&&(!t.estimate||t.estimate<=suggestMin))
-      .map(t=>({t,...suggestScore(t,suggestMin)}))
+      .map(t=>({t,...suggestScore(t,suggestMin,{energyMode:effMode})}))
       .sort((a,b)=> b.score-a.score || (a.t.createdAt-b.t.createdAt))
       .slice(0,6);
     const list=wrap.querySelector('#sgList');
@@ -2424,6 +2451,7 @@
   $('#ev-monthmode').onchange=updateEventModalVisibility;
   document.querySelectorAll('#evDays button').forEach(b=>b.onclick=()=>b.classList.toggle('sel'));
   document.querySelectorAll('#prioPick button').forEach(b=>b.onclick=()=>setPrio(+b.dataset.p));
+  document.querySelectorAll('#weightPick button').forEach(b=>b.onclick=()=>setWeight(selectedWeight===b.dataset.w?null:b.dataset.w)); // 재클릭=해제(null)
   document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('show');}));
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){ closeTask(); $('#projOverlay').classList.remove('show'); $('#eventOverlay').classList.remove('show'); }
