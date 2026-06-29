@@ -689,6 +689,8 @@
   // ---------- GTD 보드 (칸반: Inbox·다음행동·대기·언젠가) ----------
   const svgIco=id=>`<svg class="ico-sm" aria-hidden="true"><use href="#i-${id}"/></svg>`;
   const cic=id=>`<svg class="cic" aria-hidden="true"><use href="#i-${id}"/></svg>`; // 칩용 작은 라인 아이콘(장식)
+  // 마감 칩 클래스 — 근접도에 따라 색 강도(dueLevel). overdue는 하위호환 유지.
+  const dueCls=due=>{ const lv=dueLevel(due); return 'due'+(lv?' due-'+lv:'')+(lv==='over'?' overdue':''); };
   const GTD_COLS=[
     {status:'inbox', title:'Inbox', ico:svgIco('inbox')},
     {status:'next', title:'다음 할일', ico:svgIco('next')},
@@ -702,7 +704,7 @@
       <div class="gc-meta"></div>
     </div>`);
     const meta=card.querySelector('.gc-meta');
-    if(t.due) meta.appendChild(el(`<span class="chip due ${isOverdue(t.due)?'overdue':''}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
+    if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
     (t.tags||[]).slice(0,2).forEach(tag=>meta.appendChild(el(`<span class="chip tag">${esc(tag)}</span>`)));
     card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);card.classList.add('dragging');});
@@ -795,7 +797,7 @@
     const sb=subBadgeEl(t); if(sb) node.querySelector('.task-title').appendChild(sb);
     const meta=node.querySelector('.task-meta');
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
-    if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`)); }
+    if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
     if(t.block){ meta.appendChild(el(`<span class="chip block">${cic('clock')} ${t.block.date===todayStr()?'오늘 ':''}${minToHHMM(t.block.start)}</span>`)); }
     if(t.estimate){ meta.appendChild(el(`<span class="chip">${cic('clock')} ${t.estimate}분</span>`)); }
     const sc=sessionsForTask(t.id); if(sc) meta.appendChild(el(`<span class="chip pomo">${cic('pomo')} ${sc}</span>`));
@@ -1906,7 +1908,7 @@
       if(t.estimate) meta.appendChild(el(`<span class="chip">${cic('clock')} ${t.estimate}분</span>`));
       else meta.appendChild(el(`<span class="chip" style="color:var(--muted)">${cic('clock')} 소요 미정</span>`));
       if(t.priority<=3) meta.appendChild(el(`<span class="chip" style="color:var(--p${t.priority})">P${t.priority}</span>`));
-      if(t.due){ const ov=isOverdue(t.due); meta.appendChild(el(`<span class="chip due ${ov?'overdue':''}">${cic('cal')} ${fmtDue(t.due)}</span>`)); }
+      if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}</span>`));
       if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip">${esc(p.name)}</span>`)); }
       card.querySelector('[data-a="focus"]').onclick=()=>startPomoForTask(t.id);
       card.querySelector('[data-a="today"]').onclick=()=>{ t.due=todayStr(); if(t.status==='inbox'||t.status==='waiting')t.status='next'; t.updatedAt=Date.now(); save(); renderSuggest(); };

@@ -79,8 +79,14 @@ input,textarea,select{font-family:inherit}
 .task-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
 .chip{font-size:12px;padding:2px 9px;border-radius:20px;background:var(--panel-2);color:var(--muted);border:1px solid var(--border);display:inline-flex;gap:4px;align-items:center;white-space:nowrap;flex:0 0 auto}
 .chip.tag{color:var(--accent);background:var(--accent-soft);border-color:transparent;cursor:pointer}
-.chip.due{color:var(--p2)}
-.chip.due.overdue{color:var(--red);font-weight:600}
+/* 마감 칩 — 마감이 다가올수록 진하게, 멀수록 흐리게 */
+.chip.due{color:var(--amber)}
+.chip.due.due-far{color:var(--muted);opacity:.55}
+.chip.due.due-week{color:var(--amber);opacity:.7}
+.chip.due.due-soon{color:var(--amber);opacity:.9}
+.chip.due.due-d1{color:var(--amber);font-weight:600}
+.chip.due.due-d0{color:var(--amber);font-weight:700;border-color:var(--amber)}
+.chip.due.due-over,.chip.due.overdue{color:var(--red);font-weight:700;border-color:var(--red)}
 .chip.block{color:var(--p3)}
 .task-actions{display:flex;gap:2px;opacity:0;transition:.12s}
 .task:hover .task-actions{opacity:1}

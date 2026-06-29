@@ -15,6 +15,17 @@ function sortTasks(ts){
 
 // '지금 이 틈' 추천 점수 (틈 적합도 + 마감 긴급도 + 우선순위)
 function daysUntil(due){ if(!due) return null; return Math.round((parseDS(due)-parseDS(todayStr()))/86400000); }
+// 마감 근접도 → 강조 단계(가까울수록 진하게). urgencyScore와 동일 버킷.
+function dueLevel(due){
+  const d=daysUntil(due);
+  if(d==null) return null;
+  if(d<0) return 'over';   // 지남(가장 진하게)
+  if(d===0) return 'd0';   // 오늘
+  if(d===1) return 'd1';   // 내일
+  if(d<=3) return 'soon';  // 2~3일
+  if(d<=7) return 'week';  // 이번 주
+  return 'far';            // 멀다(흐리게)
+}
 function urgencyScore(t){
   const d=daysUntil(t.due);
   if(d==null) return 0.1;

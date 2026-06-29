@@ -1036,6 +1036,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('초기화 → null', JSON.parse(W.localStorage.getItem('flowdo.state.v1')).settings.focusOrder===null);
 }
 
+// ───────────────────────── 22) 마감 칩 강조 (dueLevel) ─────────────────────────
+{
+  section('마감 칩 강조');
+  const { window: W, $, $$, getErr } = boot(baseState());
+  const { dueLevel, addDaysDS } = W;
+  const td = todayDS;
+  ck('지남 → over', dueLevel(addDaysDS(td,-1))==='over' && dueLevel(addDaysDS(td,-30))==='over');
+  ck('오늘 → d0', dueLevel(td)==='d0');
+  ck('내일 → d1', dueLevel(addDaysDS(td,1))==='d1');
+  ck('2~3일 → soon', dueLevel(addDaysDS(td,2))==='soon' && dueLevel(addDaysDS(td,3))==='soon');
+  ck('4~7일 → week', dueLevel(addDaysDS(td,4))==='week' && dueLevel(addDaysDS(td,7))==='week');
+  ck('먼 미래 → far', dueLevel(addDaysDS(td,8))==='far' && dueLevel(addDaysDS(td,100))==='far');
+  ck('마감 없음 → null', dueLevel(null)===null);
+  // 렌더된 칩에 단계 클래스가 실제로 붙는지(오늘 마감 태스크)
+  const w2 = boot(baseState({ tasks:[{ id:'x', title:'오늘마감', status:'next', priority:3, due:td, tags:[], createdAt:1, updatedAt:1 }] }));
+  w2.$('.nav[data-view="today"]').click();
+  const chip = w2.$$('.chip.due')[0];
+  ck('렌더 칩에 due-d0 클래스', !!chip && chip.classList.contains('due-d0'));
+  ck('런타임 에러 없음(마감 칩)', !getErr() && !w2.getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
