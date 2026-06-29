@@ -692,7 +692,7 @@
   const GTD_COLS=[
     {status:'inbox', title:'Inbox', ico:svgIco('inbox')},
     {status:'next', title:'다음 할일', ico:svgIco('next')},
-    {status:'waiting', title:'대기 중', ico:svgIco('waiting')},
+    {status:'waiting', title:'대기중 (위임)', ico:svgIco('waiting')},
     {status:'someday', title:'언젠가', ico:svgIco('someday')},
   ];
   function gtdCard(t){
