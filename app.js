@@ -27,6 +27,7 @@
   let selectedPrio = 4;
   let selectedWeight = null; // 에너지/집중도: 'light'|'focus'|null
   let projColor = PROJECT_COLORS[0];
+  let editingProjectId = null; // 프로젝트 편집 중인 id (없으면 새 프로젝트 생성)
   let supa = null;          // supabase client
   let syncTimer = null;
   let lastSyncSig = '';     // 마지막으로 서버에 올린 내용 시그니처(중복 업로드 방지)
@@ -212,7 +213,8 @@
     // 프로젝트 뷰: 삭제 액션(할 일은 보존, 연결만 해제)
     if(currentFilter&&currentFilter.type==='project'){
       const pid=currentFilter.value;
-      const bar=el(`<div class="view-actions" style="display:flex;justify-content:flex-end;margin:-6px 0 12px"><button class="btn sm ghost" id="projDelBtn" style="color:var(--muted)">${cic('trash')} 프로젝트 삭제</button></div>`);
+      const bar=el(`<div class="view-actions" style="display:flex;gap:6px;justify-content:flex-end;margin:-6px 0 12px"><button class="btn sm ghost" id="projEditBtn" style="color:var(--muted)">${cic('note')} 프로젝트 수정</button><button class="btn sm ghost" id="projDelBtn" style="color:var(--muted)">${cic('trash')} 프로젝트 삭제</button></div>`);
+      bar.querySelector('#projEditBtn').onclick=()=>openProject(pid);
       bar.querySelector('#projDelBtn').onclick=()=>deleteProject(pid);
       content.appendChild(bar);
     }
@@ -1736,9 +1738,14 @@
     save(); closeTask(); render();
   }
 
-  // ---------- Project modal ----------
-  function openProject(){
-    $('#p-name').value=''; projColor=PROJECT_COLORS[0];
+  // ---------- Project modal ---------- (id 전달 시 편집, 없으면 새 프로젝트)
+  function openProject(id){
+    const p = id ? state.projects.find(x=>x.id===id) : null;
+    editingProjectId = p ? p.id : null;
+    $('#projHead').textContent = p ? '프로젝트 편집' : '새 프로젝트';
+    $('#projSaveBtn').textContent = p ? '저장' : '추가';
+    $('#p-name').value = p ? p.name : '';
+    projColor = p ? p.color : PROJECT_COLORS[0];
     const wrap=$('#projColors'); wrap.innerHTML='';
     const selColor=getComputedStyle(document.body).color;
     const clearSwatches=()=>document.querySelectorAll('#projColors button').forEach(x=>x.style.borderColor='transparent');
@@ -1752,8 +1759,9 @@
   }
   function saveProject(){
     const name=$('#p-name').value.trim(); if(!name) return;
-    state.projects.push({id:uid(),name,color:projColor,updatedAt:Date.now()}); save();
-    $('#projOverlay').classList.remove('show'); render();
+    if(editingProjectId){ const p=state.projects.find(x=>x.id===editingProjectId); if(p){ p.name=name; p.color=projColor; p.updatedAt=Date.now(); } }
+    else { state.projects.push({id:uid(),name,color:projColor,updatedAt:Date.now()}); }
+    save(); editingProjectId=null; $('#projOverlay').classList.remove('show'); render();
   }
   // 프로젝트 삭제 — 할 일은 지우지 않고 연결만 해제(projectId=''), 동기화 부활 방지용 tombstone 기록.
   function deleteProject(pid){
@@ -2458,7 +2466,7 @@
     b.addEventListener('click',()=>setView(b.dataset.view));
     const act=navDropActions[b.dataset.view]; if(act) makeNavDrop(b,act);
   });
-  $('#addProjectBtn').onclick=openProject;
+  $('#addProjectBtn').onclick=()=>openProject();
   $('#newTaskBtn').onclick=()=>openTask(null);
   $('#menuBtn').onclick=openSidebar;
   $('#pomoMini').onclick=()=>setView('pomodoro');

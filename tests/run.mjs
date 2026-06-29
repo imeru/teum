@@ -947,6 +947,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     ck('사용자 지정 색상 저장', !!p && p.color === '#123456');
     ck('런타임 에러 없음(색상)', !getErr());
   }
+  // (2b) 기존 프로젝트 편집 — 제목·색상 수정
+  {
+    const { $, $$, window, getErr } = boot(baseState({
+      projects: [{ id: 'p1', name: '옛이름', color: '#4f6da3', updatedAt: 1 }]
+    }));
+    window.confirm = () => true;
+    $$('#projectNav .nav')[0].click();        // 프로젝트 뷰 진입
+    ck('프로젝트 수정 버튼 노출', !!$('#projEditBtn'));
+    $('#projEditBtn').click();
+    ck('편집 모달에 기존 이름 채움', $('#p-name').value === '옛이름');
+    ck('편집 모드 제목', $('#projHead').textContent === '프로젝트 편집');
+    $('#p-name').value = '새이름';
+    $('#p-customColor').value = '#abcdef';
+    $('#p-customColor').dispatchEvent(new window.Event('input'));
+    $('#projSaveBtn').click();
+    const st = JSON.parse(window.localStorage.getItem('flowdo.state.v1'));
+    ck('이름 수정 반영', st.projects.find(p => p.id === 'p1').name === '새이름');
+    ck('색상 수정 반영', st.projects.find(p => p.id === 'p1').color === '#abcdef');
+    ck('새 프로젝트가 추가되지 않음(편집)', st.projects.length === 1);
+    ck('런타임 에러 없음(편집)', !getErr());
+  }
   // (3) 프로젝트 삭제 — 할 일은 보존(연결 해제)+tombstone
   {
     const { $, $$, window, getErr } = boot(baseState({
