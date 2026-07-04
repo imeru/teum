@@ -34,6 +34,7 @@ function boot(state, opts = {}) {
   if (opts.planview) window.localStorage.setItem('flowdo.planview', opts.planview);
   if (opts.lastview) window.localStorage.setItem('flowdo.lastview', opts.lastview);
   if (!opts.firstRun) window.localStorage.setItem('flowdo.guideSeen', '1'); // 기본은 가이드 본 상태
+  if (opts.lastAuth) window.localStorage.setItem('flowdo.lastAuth', JSON.stringify(opts.lastAuth)); // 오프라인 그레이스용 이전 로그인 기록
   let err = null;
   window.addEventListener('error', e => { err = e.error || e.message; });
   try { window.eval(JS); } catch (e) { err = e; }
@@ -441,19 +442,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const satCells = $$('.mo-cell.d-sat'), sunCells = $$('.mo-cell.d-sun');
   ck('토요일 셀 d-sat 존재', satCells.length >= 4);
   ck('일/공휴일 셀 d-sun 존재', sunCells.length >= 4);
-  // 다음 달로 이동하여 9월 추석 이름 표시 확인 (today=2026-06 기준 3개월 뒤)
-  for (let i = 0; i < 3; i++) $('#cal-next').click();
+  // 실행 시점의 달과 무관하게 결정적으로: 목표 연·월까지 계산해서 이동 (하드코딩 클릭 수 금지 — 월 바뀌면 flaky)
+  let curY = today.getFullYear(), curM = today.getMonth() + 1; // 월간 뷰는 현재 월에서 시작
+  const gotoMonth = (y, m) => {
+    let diff = (y - curY) * 12 + (m - curM);
+    while (diff > 0) { $('#cal-next').click(); diff--; }
+    while (diff < 0) { $('#cal-prev').click(); diff++; }
+    curY = y; curM = m;
+  };
+  // 2026-09 추석 이름 표시 (KR_HOLIDAY_NAMES 테이블 기준)
+  gotoMonth(2026, 9);
   const hasChuseok = $$('.mo-hol').some(e => e.textContent.includes('추석'));
   ck('월간에 공휴일 이름(추석) 표시', hasChuseok);
-  // 대체공휴일도 날짜 글씨 빨강(d-sun) — state.holidays에 없어도 테이블 기준 (3월로 이동)
-  for (let i = 0; i < 6; i++) $('#cal-prev').click(); // 9월 → 3월
+  // 대체공휴일도 날짜 글씨 빨강(d-sun) — state.holidays에 없어도 테이블 기준 (2026-03)
+  gotoMonth(2026, 3);
   const subCell = $$('.mo-cell').find(c => { const h = c.querySelector('.mo-hol'); return h && h.textContent.includes('대체공휴일'); });
   ck('대체공휴일 셀 존재', !!subCell);
   ck('대체공휴일 날짜 빨강(d-sun)', subCell && subCell.classList.contains('d-sun'));
-  // 다년: 내년(2027) 1월로 이동 → 신정(매년 고정 양력)이 자동 표시·빨강 (3월 2026 → +10개월)
-  for (let i = 0; i < 10; i++) $('#cal-next').click();
+  // 다년: 내년 1월 → 신정(매년 고정 양력 폴백)이 자동 표시·빨강
+  gotoMonth(today.getFullYear() + 1, 1);
   const ny = $$('.mo-cell').find(c => { const h = c.querySelector('.mo-hol'); return h && h.textContent.includes('신정'); });
-  ck('내년(2027) 신정 자동 표시', !!ny);
+  ck('내년 신정 자동 표시', !!ny);
   ck('내년 신정 날짜 빨강(d-sun)', ny && ny.classList.contains('d-sun'));
 }
 
@@ -1085,6 +1094,34 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     ck('풀 체크 → 완료', st.tasks.find(x=>x.id==='pt').status==='done');
     ck('완료해도 풀에 취소선 유지', !!p.$$('.pool-task.done').find(c=>c.textContent.includes('오늘마감일')));
     ck('런타임 에러 없음(풀)', !p.getErr());
+  }
+}
+
+// ───────────────────────── 24) 오프라인 그레이스 (PWA 오프라인 사용) ─────────────────────────
+{
+  section('오프라인 그레이스');
+  // 세션 확인 불가(테스트 환경 = supabase 라이브러리 로드 실패와 동일 경로) + 이전 로그인 기록 → 게이트 통과
+  {
+    const g = boot(baseState(), { lastAuth: { id: 'u-123', email: 'me@example.com', at: 1 } });
+    const gate = g.$('#authGate');
+    ck('이전 로그인 기록 → 게이트 통과', !!gate && !gate.classList.contains('show'));
+    ck('확인중 상태 해제', !gate.classList.contains('checking'));
+    ck('배지 = 오프라인', g.$('#syncBadge').textContent === '오프라인');
+    ck('런타임 에러 없음(그레이스)', !g.getErr());
+    // 명시적 로그아웃 → 기록 제거 + 게이트 복귀
+    g.$('.nav[data-view="settings"]').click();
+    const out = g.$('#cf-logout');
+    ck('설정에 로그아웃 버튼', !!out);
+    out.click();
+    ck('로그아웃 → lastAuth 제거', g.window.localStorage.getItem('flowdo.lastAuth') === null);
+    ck('로그아웃 → 게이트 다시 표시', gate.classList.contains('show'));
+  }
+  // 기록 없으면 기존대로 로그인 게이트 유지(그레이스 미적용)
+  {
+    const n = boot(baseState());
+    ck('기록 없음 → 게이트 유지', n.$('#authGate').classList.contains('show'));
+    ck('기록 없음 → 배지 로컬', n.$('#syncBadge').textContent !== '오프라인');
+    ck('런타임 에러 없음(게이트)', !n.getErr());
   }
 }
 

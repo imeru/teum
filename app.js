@@ -2383,19 +2383,31 @@
       // 기존 세션 확인 + 상태 변화 구독 (Google 로그인)
       supa.auth.getSession().then(({data})=>{
         authUser=data&&data.session?data.session.user:null;
+        if(authUser) rememberAuth(authUser);
+        else if(!navigator.onLine) offlineGrace(); // 오프라인이라 세션 확인 불가 → 이전 사용자로 로컬 사용
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
-        if(syncKey()){ cloudPull(false); subscribeRealtime(); }
+        if(!authUser||!authUser._offline){ if(syncKey()){ cloudPull(false); subscribeRealtime(); } }
       });
       supa.auth.onAuthStateChange((_e,session)=>{
         authUser=session?session.user:null;
+        if(authUser) rememberAuth(authUser);
+        else if(!navigator.onLine) offlineGrace(); // 오프라인 중 토큰 만료로 끊겨도 로그아웃시키지 않음
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
-        if(authUser&&syncKey()){ cloudPull(false); subscribeRealtime(); } else unsubscribeRealtime();
+        if(authUser&&!authUser._offline&&syncKey()){ cloudPull(false); subscribeRealtime(); } else if(!authUser) unsubscribeRealtime();
       });
       updateSyncBadge();
       if(syncKey()) await cloudPull(false);
-    }catch(err){ console.warn('Supabase init 실패',err); supa=null; authChecked=true; updateAuthGate(); updateSyncBadge(); }
+    }catch(err){ console.warn('Supabase init 실패',err); supa=null; offlineGrace(); authChecked=true; updateAuthGate(); updateSyncBadge(); }
+  }
+  // 오프라인 그레이스 — 이 기기에서 마지막으로 로그인한 계정을 기억(로그아웃 시 제거).
+  // 세션 확인이 불가능할 때(오프라인·서버 접속 실패)만 이전 사용자를 통과시켜 로컬 사용을 허용.
+  function rememberAuth(u){ try{ localStorage.setItem('flowdo.lastAuth', JSON.stringify({id:u.id,email:u.email||'',at:Date.now()})); }catch(_){} }
+  function lastAuth(){ try{ return JSON.parse(localStorage.getItem('flowdo.lastAuth')||'null'); }catch(_){ return null; } }
+  function offlineGrace(){
+    const la=lastAuth();
+    if(!authUser && la && la.id) authUser={id:la.id, email:la.email, _offline:true};
   }
   // 로그인 게이트: 로그인 전까지 앱 위를 덮는다(로그인 필수).
   function updateAuthGate(){
@@ -2422,11 +2434,13 @@
   }
   async function googleLogout(){
     unsubscribeRealtime();
-    if(supa) await supa.auth.signOut();
+    try{ localStorage.removeItem('flowdo.lastAuth'); }catch(_){} // 명시적 로그아웃 → 오프라인 그레이스도 해제
+    try{ if(supa) await supa.auth.signOut(); }catch(_){}
     authUser=null; updateSyncBadge(); updateAuthGate(); if(currentView==='settings') renderSettings();
   }
   function updateSyncBadge(){
     const b=$('#syncBadge'); if(!b) return;
+    if(authUser&&authUser._offline){ b.textContent='오프라인'; b.classList.add('on'); b.classList.remove('err'); return; } // 연결되면 자동 복구·동기화
     b.classList.toggle('err', !!(syncError && supa && syncKey()));
     if(syncError && supa && syncKey()){ b.textContent='⚠ 동기화 오류'; b.classList.add('on'); return; }
     if(supa&&authUser){ b.textContent='Google'; b.classList.add('on'); }
@@ -2586,7 +2600,7 @@
   function unsubscribeRealtime(){ try{ if(rtChannel&&supa) supa.removeChannel(rtChannel); }catch(_){} rtChannel=null; }
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') maybePull(); });
   window.addEventListener('focus', maybePull);
-  window.addEventListener('online', maybePull);
+  window.addEventListener('online', ()=>{ if(authUser&&authUser._offline){ initSupa(); } else maybePull(); }); // 복귀 시 세션 복구 → 자동 동기화
   setInterval(maybePull, 45000); // 주기적 폴링(가벼움: 내용 동일하면 네트워크만, render 생략)
   // 세션 확인이 지연되면(느린 네트워크 등) 로그인 버튼이라도 보여줌
   setTimeout(()=>{ if(!authChecked){ authChecked=true; updateAuthGate(); } }, 7000);
