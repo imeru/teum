@@ -81,6 +81,17 @@ create policy "own row" on flowdo
   with check ( id = 'u_' || auth.uid()::text );
 ```
 
+앱의 **자동 스냅샷(주 1회, `u_<본인ID>:snap:날짜`)과 보관함(`u_<본인ID>:arc`)** 행까지 쓰려면 정책을 아래로 **대체**하세요(접미사 행도 본인만 접근):
+
+```sql
+drop policy if exists "own row" on flowdo;
+
+create policy "own rows" on flowdo
+  for all to authenticated
+  using ( id = 'u_' || auth.uid()::text or id like 'u_' || auth.uid()::text || ':%' )
+  with check ( id = 'u_' || auth.uid()::text or id like 'u_' || auth.uid()::text || ':%' );
+```
+
 3. **Settings → API**에서 **Project URL**과 **publishable(anon) key**를 복사해 [`app.js`](app.js)의 `DEFAULT_CLOUD`에 입력:
 
 ```js

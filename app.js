@@ -69,6 +69,7 @@
     if(s.settings.notify===undefined) s.settings.notify=false;
     if(s.settings.notifyLead===undefined) s.settings.notifyLead=5;
     if(s.settings.focusOrder===undefined) s.settings.focusOrder=null; // 개인 집중 프로파일(미설정=null → 기존 추천 불변)
+    if(s.settings.keepMonths===undefined) s.settings.keepMonths=6; // 데이터 다이어트: 완료 후 N개월 지나면 보관(0=끄기)
     if(!s.top3) s.top3={};
     if(!s.events) s.events=[];
     if(!s.holidays) s.holidays=[];
@@ -2240,6 +2241,7 @@
     box.appendChild(settingsNotifyCard());
     box.appendChild(settingsFocusCard());
     box.appendChild(settingsHolidayCard());
+    box.appendChild(settingsDataCard());
     box.appendChild(settingsBackupCard());
     content.appendChild(box);
   }
@@ -2381,6 +2383,54 @@
     renderHol();
     return card;
   }
+  function settingsDataCard(){
+    const arc=loadArchive();
+    const mo=state.settings.keepMonths;
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
+      <strong>${svgIco('save')} 데이터 정리 · 자동 백업</strong>
+      <div class="note">완료 후 오래된 할 일·뽀모도로 기록은 보관함으로 옮겨 동기화를 가볍게 유지합니다. 보관함은 이 기기와 서버(:arc)에 남고, 전체 상태 스냅샷은 주 1회 서버에 자동 저장됩니다(최근 4개).</div>
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label>완료 항목 보관 기준</label>
+          <select id="dd-keep">${[[3,'3개월 지나면 보관'],[6,'6개월 지나면 보관 (권장)'],[12,'12개월 지나면 보관'],[0,'자동 보관 안 함']].map(([v,l])=>`<option value="${v}" ${mo===v?'selected':''}>${l}</option>`).join('')}</select>
+        </div>
+        <button class="btn" id="dd-arc-dl">보관함 다운로드</button>
+      </div>
+      <div class="note" id="dd-status">보관됨: 할 일 ${arc.tasks.length}개 · 세션 ${arc.sessions.length}개${arc.pendingSync?' · 서버 업로드 대기 중':''}</div>
+      <div class="note" id="snap-box"></div>
+    </div>`);
+    card.querySelector('#dd-keep').onchange=e=>{ state.settings.keepMonths=+e.target.value; save(); archiveSweep(); renderSettings(); };
+    card.querySelector('#dd-arc-dl').onclick=()=>{
+      const blob=new Blob([JSON.stringify(loadArchive(),null,2)],{type:'application/json'});
+      const u=URL.createObjectURL(blob); const l=document.createElement('a');
+      l.href=u; l.download=`teum-archive-${todayStr()}.json`; l.click(); URL.revokeObjectURL(u);
+    };
+    renderSnapBox(card.querySelector('#snap-box'));
+    return card;
+  }
+  // 스냅샷 목록·복원 (서버 :snap: 행). 접근 실패 시 정책 확장 안내.
+  async function renderSnapBox(box){
+    if(!supa || !authUser || authUser._offline){ box.textContent='자동 스냅샷: 로그인·온라인 상태에서 주 1회 저장됩니다.'; return; }
+    try{
+      const {data,error}=await supa.from('flowdo').select('id').like('id', syncKey()+':snap:%');
+      if(error) throw error;
+      const ids=(data||[]).map(r=>r.id).sort().reverse();
+      if(!ids.length){ box.textContent='자동 스냅샷: 아직 없음 — 주 1회 자동 저장됩니다.'; return; }
+      box.textContent='스냅샷 복원: ';
+      ids.forEach(id=>{
+        const d=id.split(':snap:')[1];
+        const b=el(`<button class="btn sm" style="margin:2px 6px 0 0">${d}</button>`);
+        b.onclick=async()=>{
+          if(!confirm(`${d} 시점 스냅샷으로 복원할까요?\n현재 데이터는 병합 없이 교체되고 모든 기기에 반영됩니다.`)) return;
+          try{
+            const {data:row,error:e2}=await supa.from('flowdo').select('data').eq('id',id).maybeSingle();
+            if(e2||!row||!row.data) throw (e2||new Error('스냅샷 없음'));
+            state=migrate(row.data); save(); render(); toast(`${d} 스냅샷으로 복원했습니다.`);
+          }catch(err){ alert('복원 실패: '+(err.message||err)); }
+        };
+        box.appendChild(b);
+      });
+    }catch(err){ box.textContent='스냅샷 접근 실패 — Supabase RLS 정책 확장이 필요합니다(README의 "own rows" SQL 참조).'; }
+  }
   function settingsBackupCard(){
     const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
       <strong>${svgIco('save')} 데이터 백업 / 복원</strong>
@@ -2411,6 +2461,64 @@
     const r=new FileReader(); r.onload=()=>{ try{ const s=JSON.parse(r.result); if(s.tasks){ state=migrate(s); save(); render(); alert('가져오기 완료'); } }catch(err){ alert('잘못된 파일'); } }; r.readAsText(f);
   }
 
+  // ---------- 데이터 다이어트(보관함) + 자동 스냅샷 ----------
+  const ARC_KEY='flowdo.archive.v1';
+  function loadArchive(){ try{ return JSON.parse(localStorage.getItem(ARC_KEY))||{tasks:[],sessions:[]}; }catch(_){ return {tasks:[],sessions:[]}; } }
+  function saveArchive(a){ try{ localStorage.setItem(ARC_KEY, JSON.stringify(a)); }catch(err){ console.warn('보관함 저장 실패',err); } }
+  // 완료 후 N개월 지난 할 일·세션 → 로컬 보관함으로 이동 + tombstone(타 기기에서도 본문에서 제거).
+  function archiveSweep(){
+    const mo=state.settings.keepMonths;
+    if(mo>0){
+      const cutoff=parseDS(addMonthsDS(todayStr(), -mo)).getTime();
+      const sp=splitArchive(state.tasks, state.sessions, cutoff);
+      if(sp.arcTasks.length||sp.arcSessions.length){
+        const arc=loadArchive();
+        const seenT=new Set(arc.tasks.map(t=>t.id)); sp.arcTasks.forEach(t=>{ if(!seenT.has(t.id)) arc.tasks.push(t); });
+        const seenS=new Set(arc.sessions.map(s=>s.id)); sp.arcSessions.forEach(s=>{ if(!seenS.has(s.id)) arc.sessions.push(s); });
+        arc.pendingSync=true; saveArchive(arc);
+        state.tasks=sp.keepTasks; state.sessions=sp.keepSessions;
+        if(!state.deletions)state.deletions={};
+        const now=Date.now();
+        [...sp.arcTasks,...sp.arcSessions].forEach(x=>{ state.deletions[x.id]=now; });
+      }
+    }
+    // tombstone은 12개월 지나면 정리(1년 이상 오프라인 기기의 부활 위험은 수용 — 보관함이 원본 보존)
+    state.deletions=pruneTombstones(state.deletions, Date.now()-365*86400000);
+    save();
+    pushArchive();
+  }
+  // 서버 보관함(:arc 행) — id 합집합 업로드. RLS 정책이 접미사 행을 허용해야 함(README 참조).
+  async function pushArchive(){
+    const arc=loadArchive();
+    if(!arc.pendingSync || !supa || !authUser || authUser._offline) return;
+    try{
+      const id=syncKey()+':arc';
+      const {data,error}=await supa.from('flowdo').select('data').eq('id',id).maybeSingle();
+      if(error) throw error;
+      const remote=(data&&data.data)||{tasks:[],sessions:[]};
+      const seenT=new Set((remote.tasks||[]).map(t=>t.id)); arc.tasks.forEach(t=>{ if(!seenT.has(t.id)) (remote.tasks=remote.tasks||[]).push(t); });
+      const seenS=new Set((remote.sessions||[]).map(s=>s.id)); arc.sessions.forEach(s=>{ if(!seenS.has(s.id)) (remote.sessions=remote.sessions||[]).push(s); });
+      const {error:e2}=await supa.from('flowdo').upsert({id, data:remote, updated_at:new Date().toISOString()});
+      if(e2) throw e2;
+      arc.pendingSync=false; saveArchive(arc);
+    }catch(err){ console.warn('보관함 업로드 실패(다음 기회에 재시도)', err); }
+  }
+  // 자동 스냅샷 — 주 1회 전체 상태를 :snap:날짜 행으로 보관, 최근 4개 유지.
+  async function autoSnapshot(){
+    if(!supa || !authUser || authUser._offline || !syncKey()) return;
+    const last=+localStorage.getItem('flowdo.lastSnap')||0;
+    if(Date.now()-last < 7*86400000) return;
+    try{
+      const id=syncKey()+':snap:'+todayStr();
+      const {error}=await supa.from('flowdo').upsert({id, data:state, updated_at:new Date().toISOString()});
+      if(error) throw error;
+      localStorage.setItem('flowdo.lastSnap', String(Date.now()));
+      const {data:rows}=await supa.from('flowdo').select('id').like('id', syncKey()+':snap:%');
+      const ids=(rows||[]).map(r=>r.id).sort();
+      if(ids.length>4) await supa.from('flowdo').delete().in('id', ids.slice(0, ids.length-4));
+    }catch(err){ console.warn('자동 스냅샷 실패(정책 확장 필요할 수 있음 — README 참조)', err); }
+  }
+
   // Supabase via dynamic import (CDN). Loads only when configured.
   async function initSupa(){
     if(!(cloud.url&&cloud.key)){ supa=null; authUser=null; updateSyncBadge(); return; }
@@ -2425,6 +2533,7 @@
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(!authUser||!authUser._offline){ if(syncKey()){ cloudPull(false); subscribeRealtime(); } }
+        setTimeout(()=>{ pushArchive(); autoSnapshot(); }, 4000); // 초기 pull 이후 보관함 업로드·주간 스냅샷
       });
       supa.auth.onAuthStateChange((_e,session)=>{
         authUser=session?session.user:null;
@@ -2620,6 +2729,7 @@
   else setView(RESTORABLE_VIEWS.has(lastView) ? lastView : 'today');
   updateAuthGate();
   startReminderLoop();
+  if(!localPristine) archiveSweep(); // 데이터 다이어트: 부팅 시 1회(첫 동기화 전 데모/빈 상태는 제외)
   if(cloud.url&&cloud.key) initSupa();
   // 다른 기기의 변경을 가져오기 위한 재동기화(pull). 앱이 떠 있어도 최신화.
   // 편집/모달 중에는 보류 — 병합 render가 작업 중 입력을 끊지 않도록.

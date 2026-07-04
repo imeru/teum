@@ -1210,6 +1210,59 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음(undo)', !getErr());
 }
 
+// ───────────────────────── 28) 데이터 다이어트(보관) + 스냅샷 UI ─────────────────────────
+{
+  section('데이터 다이어트');
+  const { window: W } = boot(baseState());
+  const cutoff = W.parseDS(W.addMonthsDS(todayDS, -6)).getTime();
+  const oldMs = W.parseDS(W.addMonthsDS(todayDS, -7)).getTime();
+  // 순수함수 단위
+  let sp = W.splitArchive(
+    [ { id:'o', status:'done', completedAt:oldMs, updatedAt:1 },
+      { id:'r', status:'done', completedAt:Date.now()-1000, updatedAt:1 },
+      { id:'a', status:'next', updatedAt:1 } ],
+    [ { id:'so', at:oldMs }, { id:'sd', date:W.addMonthsDS(todayDS,-8) }, { id:'sr', at:Date.now()-1000 } ],
+    cutoff);
+  ck('오래된 완료 → 보관 대상', sp.arcTasks.length===1 && sp.arcTasks[0].id==='o');
+  ck('최근 완료·미완료는 유지', sp.keepTasks.length===2 && sp.keepTasks.every(t=>t.id!=='o'));
+  ck('세션 at·date 기준 분리', sp.arcSessions.map(s=>s.id).sort().join()==='sd,so' && sp.keepSessions[0].id==='sr');
+  ck('미완료는 아무리 오래돼도 보관 안 함', W.splitArchive([{id:'x',status:'next',updatedAt:1}],[],cutoff).arcTasks.length===0);
+  const pt = W.pruneTombstones({ old: Date.now()-400*86400000, recent: Date.now()-1000 }, Date.now()-365*86400000);
+  ck('오래된 tombstone 정리', !pt.old && !!pt.recent);
+  // 통합: 부팅 스윕 → 본문에서 제거 + tombstone + 로컬 보관함 저장
+  const b = boot(baseState({
+    tasks: [
+      { id:'oldDone', title:'옛완료', status:'done', priority:3, completedAt:oldMs, tags:[], createdAt:1, updatedAt:1 },
+      { id:'newDone', title:'새완료', status:'done', priority:3, completedAt:Date.now()-1000, tags:[], createdAt:2, updatedAt:1 },
+      { id:'act', title:'진행중', status:'next', priority:3, tags:[], createdAt:3, updatedAt:1 },
+    ],
+    sessions: [ { id:'sOld', taskId:'oldDone', date:'2025-01-01', duration:25, at:oldMs } ],
+  }));
+  const st = JSON.parse(b.window.localStorage.getItem('flowdo.state.v1'));
+  ck('부팅 스윕: 오래된 완료 본문 제거', !st.tasks.some(t=>t.id==='oldDone'));
+  ck('부팅 스윕: 최근 완료·진행중 유지', st.tasks.length===2);
+  ck('부팅 스윕: 오래된 세션 제거', st.sessions.length===0);
+  ck('tombstone 기록(타 기기 전파)', !!st.deletions.oldDone && !!st.deletions.sOld);
+  const arc = JSON.parse(b.window.localStorage.getItem('flowdo.archive.v1'));
+  ck('로컬 보관함에 보존', arc.tasks[0].id==='oldDone' && arc.sessions[0].id==='sOld' && arc.pendingSync===true);
+  ck('런타임 에러 없음(스윕)', !b.getErr());
+  // 끄기(keepMonths=0) → 정리 안 함
+  const off = boot(baseState({
+    settings: { focus:25, short:5, long:15, longEvery:4, keepMonths:0 },
+    tasks: [ { id:'oldDone', title:'옛완료', status:'done', priority:3, completedAt:oldMs, tags:[], createdAt:1, updatedAt:1 } ],
+  }));
+  ck('끄기 → 보관 안 함', JSON.parse(off.window.localStorage.getItem('flowdo.state.v1')).tasks.length===1);
+  // 설정 UI
+  b.$('.nav[data-view="settings"]').click();
+  ck('보관 기준 선택 존재', !!b.$('#dd-keep') && b.$('#dd-keep').value==='6');
+  ck('보관함 다운로드 버튼', !!b.$('#dd-arc-dl'));
+  ck('보관 현황 표시', b.$('#dd-status').textContent.includes('할 일 1개'));
+  ck('스냅샷 안내 표시', b.$('#snap-box').textContent.includes('스냅샷'));
+  b.$('#dd-keep').value='12'; b.$('#dd-keep').dispatchEvent(new b.window.Event('change'));
+  ck('보관 기준 변경 저장', JSON.parse(b.window.localStorage.getItem('flowdo.state.v1')).settings.keepMonths===12);
+  ck('런타임 에러 없음(설정)', !b.getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

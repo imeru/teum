@@ -15,6 +15,25 @@ function sortTasks(ts){
 
 // '지금 이 틈' 추천 점수 (틈 적합도 + 마감 긴급도 + 우선순위)
 function daysUntil(due){ if(!due) return null; return Math.round((parseDS(due)-parseDS(todayStr()))/86400000); }
+// 데이터 다이어트 — cutoffMs 이전에 끝난 완료 할 일·세션을 보관 대상으로 분리(순수).
+// 완료 시각은 completedAt, 없으면 updatedAt 폴백. 미완료 할 일은 절대 대상 아님.
+function splitArchive(tasks, sessions, cutoffMs){
+  const doneAt=t=>t.completedAt||t.updatedAt||0;
+  const arcTasks=(tasks||[]).filter(t=>isDone(t) && doneAt(t)>0 && doneAt(t)<cutoffMs);
+  const ids=new Set(arcTasks.map(t=>t.id));
+  const keepTasks=(tasks||[]).filter(t=>!ids.has(t.id));
+  const sAt=s=>s.at || (s.date?parseDS(s.date).getTime():0);
+  const arcSessions=(sessions||[]).filter(s=>sAt(s)>0 && sAt(s)<cutoffMs);
+  const sids=new Set(arcSessions.map(s=>s.id));
+  const keepSessions=(sessions||[]).filter(s=>!sids.has(s.id));
+  return {keepTasks, arcTasks, keepSessions, arcSessions};
+}
+// 오래된 tombstone 정리 — cutoffMs 이전 삭제 기록 제거(동기화 페이로드 억제).
+function pruneTombstones(deletions, cutoffMs){
+  const out={};
+  for(const k in (deletions||{})) if(deletions[k]>=cutoffMs) out[k]=deletions[k];
+  return out;
+}
 // 반복 할 일 — 다음 회차 마감일. monthly는 말일 클램프(1/31 → 2/28).
 function nextRepeatDate(repeat, fromDS){
   if(repeat==='daily') return addDaysDS(fromDS,1);
