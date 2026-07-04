@@ -2388,14 +2388,14 @@
     const mo=state.settings.keepMonths;
     const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
       <strong>${svgIco('save')} 데이터 정리 · 자동 백업</strong>
-      <div class="note">완료 후 오래된 할 일·뽀모도로 기록은 보관함으로 옮겨 동기화를 가볍게 유지합니다. 보관함은 이 기기와 서버(:arc)에 남고, 전체 상태 스냅샷은 주 1회 서버에 자동 저장됩니다(최근 4개).</div>
+      <div class="note">완료 후 오래된 할 일·뽀모도로 기록(아래 기준)과 <b>종료 후 5년</b> 지난 일정은 보관함으로 옮겨 동기화를 가볍게 유지합니다. 보관함은 이 기기와 서버(:arc)에 남고, 전체 상태 스냅샷은 주 1회 서버에 자동 저장됩니다(최근 4개).</div>
       <div class="row" style="align-items:flex-end">
         <div class="field"><label>완료 항목 보관 기준</label>
           <select id="dd-keep">${[[3,'3개월 지나면 보관'],[6,'6개월 지나면 보관 (권장)'],[12,'12개월 지나면 보관'],[0,'자동 보관 안 함']].map(([v,l])=>`<option value="${v}" ${mo===v?'selected':''}>${l}</option>`).join('')}</select>
         </div>
         <button class="btn" id="dd-arc-dl">보관함 다운로드</button>
       </div>
-      <div class="note" id="dd-status">보관됨: 할 일 ${arc.tasks.length}개 · 세션 ${arc.sessions.length}개${arc.pendingSync?' · 서버 업로드 대기 중':''}</div>
+      <div class="note" id="dd-status">보관됨: 할 일 ${arc.tasks.length}개 · 세션 ${arc.sessions.length}개 · 일정 ${arc.events.length}개${arc.pendingSync?' · 서버 업로드 대기 중':''}</div>
       <div class="note" id="snap-box"></div>
     </div>`);
     card.querySelector('#dd-keep').onchange=e=>{ state.settings.keepMonths=+e.target.value; save(); archiveSweep(); renderSettings(); };
@@ -2463,23 +2463,26 @@
 
   // ---------- 데이터 다이어트(보관함) + 자동 스냅샷 ----------
   const ARC_KEY='flowdo.archive.v1';
-  function loadArchive(){ try{ return JSON.parse(localStorage.getItem(ARC_KEY))||{tasks:[],sessions:[]}; }catch(_){ return {tasks:[],sessions:[]}; } }
+  const EVENT_KEEP_MONTHS=60; // 일정 보관 기준: 종료 후 5년
+  function loadArchive(){ try{ const a=JSON.parse(localStorage.getItem(ARC_KEY))||{}; return {tasks:a.tasks||[],sessions:a.sessions||[],events:a.events||[],pendingSync:!!a.pendingSync}; }catch(_){ return {tasks:[],sessions:[],events:[]}; } }
   function saveArchive(a){ try{ localStorage.setItem(ARC_KEY, JSON.stringify(a)); }catch(err){ console.warn('보관함 저장 실패',err); } }
-  // 완료 후 N개월 지난 할 일·세션 → 로컬 보관함으로 이동 + tombstone(타 기기에서도 본문에서 제거).
+  // 완료 후 N개월 지난 할 일·세션 + 종료 후 5년 지난 일정 → 보관함으로 이동 + tombstone(타 기기에서도 제거).
   function archiveSweep(){
     const mo=state.settings.keepMonths;
     if(mo>0){
       const cutoff=parseDS(addMonthsDS(todayStr(), -mo)).getTime();
-      const sp=splitArchive(state.tasks, state.sessions, cutoff);
-      if(sp.arcTasks.length||sp.arcSessions.length){
+      const evCut=addMonthsDS(todayStr(), -EVENT_KEEP_MONTHS);
+      const sp=splitArchive(state.tasks, state.sessions, cutoff, state.events, evCut);
+      if(sp.arcTasks.length||sp.arcSessions.length||sp.arcEvents.length){
         const arc=loadArchive();
         const seenT=new Set(arc.tasks.map(t=>t.id)); sp.arcTasks.forEach(t=>{ if(!seenT.has(t.id)) arc.tasks.push(t); });
         const seenS=new Set(arc.sessions.map(s=>s.id)); sp.arcSessions.forEach(s=>{ if(!seenS.has(s.id)) arc.sessions.push(s); });
+        const seenE=new Set(arc.events.map(e=>e.id)); sp.arcEvents.forEach(e=>{ if(!seenE.has(e.id)) arc.events.push(e); });
         arc.pendingSync=true; saveArchive(arc);
-        state.tasks=sp.keepTasks; state.sessions=sp.keepSessions;
+        state.tasks=sp.keepTasks; state.sessions=sp.keepSessions; state.events=sp.keepEvents;
         if(!state.deletions)state.deletions={};
         const now=Date.now();
-        [...sp.arcTasks,...sp.arcSessions].forEach(x=>{ state.deletions[x.id]=now; });
+        [...sp.arcTasks,...sp.arcSessions,...sp.arcEvents].forEach(x=>{ state.deletions[x.id]=now; });
       }
     }
     // tombstone은 12개월 지나면 정리(1년 이상 오프라인 기기의 부활 위험은 수용 — 보관함이 원본 보존)
@@ -2495,9 +2498,10 @@
       const id=syncKey()+':arc';
       const {data,error}=await supa.from('flowdo').select('data').eq('id',id).maybeSingle();
       if(error) throw error;
-      const remote=(data&&data.data)||{tasks:[],sessions:[]};
+      const remote=(data&&data.data)||{tasks:[],sessions:[],events:[]};
       const seenT=new Set((remote.tasks||[]).map(t=>t.id)); arc.tasks.forEach(t=>{ if(!seenT.has(t.id)) (remote.tasks=remote.tasks||[]).push(t); });
       const seenS=new Set((remote.sessions||[]).map(s=>s.id)); arc.sessions.forEach(s=>{ if(!seenS.has(s.id)) (remote.sessions=remote.sessions||[]).push(s); });
+      const seenE=new Set((remote.events||[]).map(e=>e.id)); arc.events.forEach(e=>{ if(!seenE.has(e.id)) (remote.events=remote.events||[]).push(e); });
       const {error:e2}=await supa.from('flowdo').upsert({id, data:remote, updated_at:new Date().toISOString()});
       if(e2) throw e2;
       arc.pendingSync=false; saveArchive(arc);

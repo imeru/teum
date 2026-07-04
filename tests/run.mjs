@@ -1229,6 +1229,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('미완료는 아무리 오래돼도 보관 안 함', W.splitArchive([{id:'x',status:'next',updatedAt:1}],[],cutoff).arcTasks.length===0);
   const pt = W.pruneTombstones({ old: Date.now()-400*86400000, recent: Date.now()-1000 }, Date.now()-365*86400000);
   ck('오래된 tombstone 정리', !pt.old && !!pt.recent);
+  // 일정 축(5년): 확정 종료된 것만, 종료 후 5년 지나면 보관
+  const evCut = W.addMonthsDS(todayDS, -60);
+  ck('eventEndDS: once=endDate, 무기한 정기=null',
+    W.eventEndDS({freq:'once',startDate:'2020-01-01',endDate:'2020-01-02'})==='2020-01-02' &&
+    W.eventEndDS({freq:'weekly',endMode:'date',endDate:'2020-06-01'})==='2020-06-01' &&
+    W.eventEndDS({freq:'weekly',endMode:'never'})===null && W.eventEndDS({freq:'weekly',endMode:'count',count:10})===null);
+  const spe = W.splitArchive([],[],cutoff,[
+    { id:'e6y', title:'옛행사', freq:'once', startDate:W.addMonthsDS(todayDS,-72), endDate:W.addMonthsDS(todayDS,-72) },
+    { id:'e1y', title:'작년행사', freq:'once', startDate:W.addMonthsDS(todayDS,-12), endDate:W.addMonthsDS(todayDS,-12) },
+    { id:'inf', title:'무기한정기', freq:'weekly', days:[1], endMode:'never', startDate:'2018-01-01' },
+    { id:'d6y', title:'옛정기', freq:'weekly', days:[1], endMode:'date', startDate:'2019-01-01', endDate:W.addMonthsDS(todayDS,-70) },
+  ], evCut);
+  ck('종료 5년 지난 일정만 보관', spe.arcEvents.map(e=>e.id).sort().join()==='d6y,e6y');
+  ck('최근·무기한 일정 유지', spe.keepEvents.map(e=>e.id).sort().join()==='e1y,inf');
   // 통합: 부팅 스윕 → 본문에서 제거 + tombstone + 로컬 보관함 저장
   const b = boot(baseState({
     tasks: [
@@ -1237,14 +1251,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       { id:'act', title:'진행중', status:'next', priority:3, tags:[], createdAt:3, updatedAt:1 },
     ],
     sessions: [ { id:'sOld', taskId:'oldDone', date:'2025-01-01', duration:25, at:oldMs } ],
+    events: [
+      { id:'evOld', title:'옛행사', freq:'once', start:600, duration:60, startDate:'2019-03-01', endDate:'2019-03-01' },
+      { id:'evNew', title:'작년행사', freq:'once', start:600, duration:60, startDate:W.addMonthsDS(todayDS,-12), endDate:W.addMonthsDS(todayDS,-12) },
+      { id:'evInf', title:'무기한정기', freq:'weekly', days:[1], start:540, duration:60, endMode:'never', startDate:'2018-01-01' },
+    ],
   }));
   const st = JSON.parse(b.window.localStorage.getItem('flowdo.state.v1'));
   ck('부팅 스윕: 오래된 완료 본문 제거', !st.tasks.some(t=>t.id==='oldDone'));
   ck('부팅 스윕: 최근 완료·진행중 유지', st.tasks.length===2);
   ck('부팅 스윕: 오래된 세션 제거', st.sessions.length===0);
-  ck('tombstone 기록(타 기기 전파)', !!st.deletions.oldDone && !!st.deletions.sOld);
+  ck('부팅 스윕: 5년 지난 일정 제거·나머지 유지', !st.events.some(e=>e.id==='evOld') && st.events.length===2);
+  ck('tombstone 기록(타 기기 전파)', !!st.deletions.oldDone && !!st.deletions.sOld && !!st.deletions.evOld);
   const arc = JSON.parse(b.window.localStorage.getItem('flowdo.archive.v1'));
-  ck('로컬 보관함에 보존', arc.tasks[0].id==='oldDone' && arc.sessions[0].id==='sOld' && arc.pendingSync===true);
+  ck('로컬 보관함에 보존', arc.tasks[0].id==='oldDone' && arc.sessions[0].id==='sOld' && arc.events[0].id==='evOld' && arc.pendingSync===true);
   ck('런타임 에러 없음(스윕)', !b.getErr());
   // 끄기(keepMonths=0) → 정리 안 함
   const off = boot(baseState({

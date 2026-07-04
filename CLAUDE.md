@@ -50,7 +50,7 @@
 - `projects[]`: `{id,name,color}`
 - `sessions[]`: 뽀모도로 집중 기록 `{id,taskId,date,duration,at}`
 - `settings`: `{focus,short,long,longEvery}` (뽀모도로 분 단위) + `notify,notifyLead`(알림) + `focusOrder`(개인 집중 프로파일: 6블록 키 순열 또는 null=미설정 → '지금 이 틈' 기본 모드 결정. 미설정/무효 시 timeOfDayMode 폴백 → 추천 순위 불변) + `keepMonths`(데이터 다이어트: 완료 후 N개월 지나면 보관, 0=끄기, 기본 6)
-- 보관함: `flowdo.archive.v1`(로컬) + 서버 `u_<id>:arc` 행 — archiveSweep이 오래된 완료 할 일·세션을 이동(+tombstone). 자동 스냅샷: 주 1회 `u_<id>:snap:날짜` 행, 최근 4개 유지. 접미사 행은 RLS "own rows" 정책 필요(README).
+- 보관함: `flowdo.archive.v1`(로컬) + 서버 `u_<id>:arc` 행 — archiveSweep이 오래된 완료 할 일·세션(keepMonths, 기본 6개월)과 **종료 후 5년(60개월) 지난 일정**(확정 종료만: once·endMode date — eventEndDS)을 이동(+tombstone). 자동 스냅샷: 주 1회 `u_<id>:snap:날짜` 행, 최근 4개 유지. 접미사 행은 RLS "own rows" 정책 필요(README).
 - `top3`: `{ 'YYYY-MM-DD': [taskId,taskId,taskId] }` (날짜별 우선순위 TOP3)
 - `events[]`: 정기(반복) 일정
   - `{id,title,start,duration,color,freq,interval,days[],monthMode,ordinal,weekday,startDate,endMode,endDate,count,excludeHolidays}`

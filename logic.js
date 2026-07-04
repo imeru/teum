@@ -15,9 +15,16 @@ function sortTasks(ts){
 
 // '지금 이 틈' 추천 점수 (틈 적합도 + 마감 긴급도 + 우선순위)
 function daysUntil(due){ if(!due) return null; return Math.round((parseDS(due)-parseDS(todayStr()))/86400000); }
-// 데이터 다이어트 — cutoffMs 이전에 끝난 완료 할 일·세션을 보관 대상으로 분리(순수).
-// 완료 시각은 completedAt, 없으면 updatedAt 폴백. 미완료 할 일은 절대 대상 아님.
-function splitArchive(tasks, sessions, cutoffMs){
+// 일정의 확정 종료일(YYYY-MM-DD) — 1회성=endDate||startDate, 날짜 종료 정기=endDate.
+// 종료 없음·횟수 종료 정기 일정은 null(진행 중 간주 → 보관 대상 아님).
+function eventEndDS(ev){
+  if(ev.freq==='once') return ev.endDate||ev.startDate||null;
+  if(ev.endMode==='date'&&ev.endDate) return ev.endDate;
+  return null;
+}
+// 데이터 다이어트 — 오래된 완료 할 일·세션(cutoffMs)과 오래전 끝난 일정(evCutoffDS)을 보관 대상으로 분리(순수).
+// 완료 시각은 completedAt, 없으면 updatedAt 폴백. 미완료 할 일·진행 중 일정은 절대 대상 아님.
+function splitArchive(tasks, sessions, cutoffMs, events, evCutoffDS){
   const doneAt=t=>t.completedAt||t.updatedAt||0;
   const arcTasks=(tasks||[]).filter(t=>isDone(t) && doneAt(t)>0 && doneAt(t)<cutoffMs);
   const ids=new Set(arcTasks.map(t=>t.id));
@@ -26,7 +33,10 @@ function splitArchive(tasks, sessions, cutoffMs){
   const arcSessions=(sessions||[]).filter(s=>sAt(s)>0 && sAt(s)<cutoffMs);
   const sids=new Set(arcSessions.map(s=>s.id));
   const keepSessions=(sessions||[]).filter(s=>!sids.has(s.id));
-  return {keepTasks, arcTasks, keepSessions, arcSessions};
+  const arcEvents=(evCutoffDS?(events||[]):[]).filter(ev=>{ const end=eventEndDS(ev); return !!end && end<evCutoffDS; });
+  const eids=new Set(arcEvents.map(e=>e.id));
+  const keepEvents=(events||[]).filter(e=>!eids.has(e.id));
+  return {keepTasks, arcTasks, keepSessions, arcSessions, keepEvents, arcEvents};
 }
 // 오래된 tombstone 정리 — cutoffMs 이전 삭제 기록 제거(동기화 페이로드 억제).
 function pruneTombstones(deletions, cutoffMs){
