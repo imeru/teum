@@ -170,10 +170,16 @@
       </div>
       <div class="row">
         <div class="field">
-          <label>마감일 / 시간</label>
+          <label>마감일 / 시간 / 반복</label>
           <div style="display:flex;gap:8px">
             <input id="f-due" type="date" style="flex:1;min-width:0" />
             <input id="f-duetime" type="time" style="flex:0 0 108px" />
+            <select id="f-repeat" style="flex:0 0 88px" title="완료하면 다음 회차가 자동 생성됩니다">
+              <option value="">반복 없음</option>
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
           </div>
         </div>
         <div class="field">

@@ -42,8 +42,9 @@
   예) `node --check app.js` 문법 검사 후, jsdom 스크립트로 렌더·드래그·이벤트 테스트.
 
 ## 데이터 모델 (localStorage 키 `flowdo.state.v1`)
-- `tasks[]`: `{id,title,notes,status,priority(1~4),tags[],projectId,due,dueTime,block,weight,createdAt,updatedAt,completedAt}`
+- `tasks[]`: `{id,title,notes,status,priority(1~4),tags[],projectId,due,dueTime,repeat,block,weight,createdAt,updatedAt,completedAt}`
   - `weight`: `'light' | 'focus' | null` — 에너지/집중도. '지금 이 틈' 추천의 energyFit 가중에 사용(비영속 에너지 모드와 결합).
+  - `repeat`: `'daily' | 'weekly' | 'monthly' | null` — 반복 할 일. 완료 시 다음 회차(마감 +1일/+7일/+1개월, 말일 클램프)가 자동 생성(nextRepeatDate).
   - `status`: inbox | next | waiting | someday | done (GTD 분류)
   - `block`: `{date, start(분), duration(분)}` — 타임박스 배치
 - `projects[]`: `{id,name,color}`

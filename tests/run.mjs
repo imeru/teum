@@ -1125,6 +1125,91 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
 }
 
+// ───────────────────────── 25) 반복 할 일 ─────────────────────────
+{
+  section('반복 할 일');
+  const { window: W } = boot(baseState());
+  const N = W.nextRepeatDate;
+  ck('매일 +1일', N('daily','2026-07-03')==='2026-07-04');
+  ck('매주 +7일', N('weekly','2026-07-03')==='2026-07-10');
+  ck('매월 +1개월', N('monthly','2026-07-03')==='2026-08-03');
+  ck('매월 말일 클램프(1/31→2/28)', N('monthly','2026-01-31')==='2026-02-28');
+  ck('매월 말일 클램프(3/31→4/30)', N('monthly','2026-03-31')==='2026-04-30');
+  ck('반복 없음 → null', N(null,'2026-07-03')===null && N('bogus','2026-07-03')===null);
+  // migrate 정규화는 동작으로 검증: 잘못된 repeat는 완료해도 다음 회차가 생기지 않아야 함
+  const m = boot(baseState({ tasks:[{ id:'r', title:'루틴', status:'next', priority:3, repeat:'bogus', due:todayDS, tags:[], createdAt:1, updatedAt:1 }] }));
+  m.$('.nav[data-view="today"]').click();
+  m.$('.task .check').click();
+  ck('migrate: 잘못된 repeat → 다음 회차 없음', JSON.parse(m.window.localStorage.getItem('flowdo.state.v1')).tasks.length===1);
+  // 완료 → 다음 회차 자동 생성 + 실행 취소로 회수
+  const w = boot(baseState({ tasks:[{ id:'w1', title:'주간보고', status:'next', priority:2, repeat:'weekly', due:todayDS,
+    subtasks:[{id:'s1',title:'초안',done:true}], tags:[], createdAt:1, updatedAt:1 }] }));
+  w.$('.nav[data-view="today"]').click();
+  ck('편집 모달 반복 선택 존재', !!w.$('#f-repeat'));
+  w.$('.task .check').click();
+  let st = JSON.parse(w.window.localStorage.getItem('flowdo.state.v1'));
+  const next = st.tasks.find(t=>t.id!=='w1');
+  ck('완료 → 원본 done 유지', st.tasks.find(t=>t.id==='w1').status==='done');
+  ck('다음 회차 생성(next)', !!next && next.status==='next');
+  ck('다음 회차 마감 = +7일', next && next.due===w.window.addDaysDS(todayDS,7));
+  ck('다음 회차 체크리스트 초기화', next && next.subtasks[0].done===false);
+  ck('다음 회차도 반복 유지', next && next.repeat==='weekly');
+  w.$('.toast-undo').click();
+  st = JSON.parse(w.window.localStorage.getItem('flowdo.state.v1'));
+  ck('실행 취소 → 미완료 복원', st.tasks.find(t=>t.id==='w1').status==='next');
+  ck('실행 취소 → 생성 회차 회수+tombstone', st.tasks.length===1 && !!st.deletions[next.id]);
+  ck('런타임 에러 없음(반복)', !w.getErr());
+}
+
+// ───────────────────────── 26) 블록 겹침 나란히 배치 ─────────────────────────
+{
+  section('블록 겹침 레인');
+  const { window: W } = boot(baseState());
+  const A = W.assignLanes;
+  let r = A([{start:0,end:60},{start:60,end:120}]);
+  ck('안 겹치면 lanes=1', r[0].lanes===1 && r[1].lanes===1);
+  r = A([{start:0,end:60},{start:30,end:90}]);
+  ck('겹치면 lanes=2·레인 상이', r[0].lanes===2 && r[1].lanes===2 && r[0].lane!==r[1].lane);
+  r = A([{start:0,end:60},{start:30,end:90},{start:60,end:120}]);
+  ck('체인 겹침 = 한 클러스터·레인 재사용', r.every(x=>x.lanes===2) && r[2].lane===0);
+  const d = boot(baseState({ tasks:[
+    { id:'b1', title:'블록1', status:'next', priority:3, block:{date:todayDS,start:540,duration:60}, tags:[], createdAt:1, updatedAt:1 },
+    { id:'b2', title:'블록2', status:'next', priority:3, block:{date:todayDS,start:570,duration:60}, tags:[], createdAt:2, updatedAt:1 },
+  ] }), { planview:'day' });
+  d.$('.nav[data-view="plan"]').click();
+  const cards = d.$$('.block-card');
+  ck('겹친 블록 → lanes=2', cards.length===2 && cards.every(c=>c.dataset.lanes==='2'));
+  ck('서로 다른 레인', cards[0].dataset.lane!==cards[1].dataset.lane);
+  ck('너비 균등 분할(.laned + --lanes)', cards[0].classList.contains('laned') && cards[0].style.getPropertyValue('--lanes')==='2');
+  const x = boot(baseState({
+    tasks:[{ id:'b', title:'작업', status:'next', priority:3, block:{date:todayDS,start:600,duration:60}, tags:[], createdAt:1, updatedAt:1 }],
+    events:[{ id:'e', title:'회의', start:570, duration:60, freq:'once', startDate:todayDS, endDate:todayDS, color:'#0d9488' }]
+  }), { planview:'day' });
+  x.$('.nav[data-view="plan"]').click();
+  ck('일정+블록도 나란히', x.$('.event-card').dataset.lanes==='2' && x.$('.block-card').dataset.lanes==='2');
+  ck('런타임 에러 없음(레인)', !d.getErr() && !x.getErr());
+}
+
+// ───────────────────────── 27) 실행 취소 토스트 ─────────────────────────
+{
+  section('실행 취소');
+  const { $, window: W, getErr } = boot(baseState({ tasks:[{ id:'d1', title:'지울일', status:'next', priority:3, due:todayDS, tags:[], createdAt:1, updatedAt:1 }] }));
+  $('.nav[data-view="today"]').click();
+  $('.task [data-act="del"]').click();
+  let st = JSON.parse(W.localStorage.getItem('flowdo.state.v1'));
+  ck('삭제 + tombstone', st.tasks.length===0 && !!st.deletions.d1);
+  ck('실행 취소 버튼 표시', !!$('.toast-undo'));
+  $('.toast-undo').click();
+  st = JSON.parse(W.localStorage.getItem('flowdo.state.v1'));
+  ck('복원 + tombstone 해제', st.tasks.length===1 && !st.deletions.d1);
+  $('.task .check').click();
+  ck('완료도 실행 취소 표시', !!$('.toast-undo'));
+  $('.toast-undo').click();
+  st = JSON.parse(W.localStorage.getItem('flowdo.state.v1'));
+  ck('완료 실행 취소 → next 복원', st.tasks[0].status==='next' && !st.tasks[0].completedAt);
+  ck('런타임 에러 없음(undo)', !getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

@@ -79,6 +79,7 @@
     });
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
     (s.tasks||[]).forEach(t=>{ if(t.weight!=='light'&&t.weight!=='focus') t.weight=null; }); // 에너지/집중도 가중치 정규화
+    (s.tasks||[]).forEach(t=>{ if(t.repeat!=='daily'&&t.repeat!=='weekly'&&t.repeat!=='monthly') t.repeat=null; }); // 반복 주기 정규화
     if(!s.weekNotes) s.weekNotes={};
     if(!Array.isArray(s.memos)) s.memos=[];
     if(!Array.isArray(s.folders)) s.folders=[];
@@ -705,6 +706,7 @@
     </div>`);
     const meta=card.querySelector('.gc-meta');
     if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
+    if(t.repeat) meta.appendChild(el(`<span class="chip">${cic('repeat')} ${({daily:'매일',weekly:'매주',monthly:'매월'})[t.repeat]}</span>`));
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
     (t.tags||[]).slice(0,2).forEach(tag=>meta.appendChild(el(`<span class="chip tag">${esc(tag)}</span>`)));
     card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);card.classList.add('dragging');});
@@ -798,6 +800,7 @@
     const meta=node.querySelector('.task-meta');
     if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip"><span class="proj-color" style="background:${p.color}"></span>${esc(p.name)}</span>`)); }
     if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}${t.dueTime?' '+t.dueTime:''}</span>`));
+    if(t.repeat) meta.appendChild(el(`<span class="chip">${cic('repeat')} ${({daily:'매일',weekly:'매주',monthly:'매월'})[t.repeat]}</span>`));
     if(t.block){ meta.appendChild(el(`<span class="chip block">${cic('clock')} ${t.block.date===todayStr()?'오늘 ':''}${minToHHMM(t.block.start)}</span>`)); }
     if(t.estimate){ meta.appendChild(el(`<span class="chip">${cic('clock')} ${t.estimate}분</span>`)); }
     const sc=sessionsForTask(t.id); if(sc) meta.appendChild(el(`<span class="chip pomo">${cic('pomo')} ${sc}</span>`));
@@ -814,16 +817,36 @@
     return node;
   }
 
+  // 반복 할 일: 완료 시 다음 회차를 자동 생성. 생성된 id 반환(실행 취소용).
+  function spawnRepeat(t){
+    const anchor=(t.due && t.due>=todayStr())?t.due:todayStr(); // 밀린 반복은 오늘 기준으로 다음 회차
+    const due=nextRepeatDate(t.repeat, anchor); if(!due) return null;
+    const n={...t, id:uid(), status:t._prev||'next', due, block:null, completedAt:null, createdAt:Date.now(), updatedAt:Date.now()};
+    delete n._prev;
+    if(n.subtasks&&n.subtasks.length) n.subtasks=n.subtasks.map(s=>({...s, id:uid(), done:false})); // 체크리스트 초기화
+    state.tasks.push(n); return n.id;
+  }
   function toggleDone(id){
     const t=state.tasks.find(x=>x.id===id); if(!t) return;
-    if(isDone(t)){ t.status = t._prev||'next'; t.completedAt=null; }
-    else { t._prev=t.status; t.status='done'; t.completedAt=Date.now(); }
+    if(isDone(t)){ t.status = t._prev||'next'; t.completedAt=null; t.updatedAt=Date.now(); save(); render(); return; }
+    t._prev=t.status; t.status='done'; t.completedAt=Date.now();
+    const nid=t.repeat?spawnRepeat(t):null;
     t.updatedAt=Date.now(); save(); render();
+    const next=nid?state.tasks.find(x=>x.id===nid):null;
+    toast(next?`완료 — 다음 회차 ${fmtDue(next.due)}`:'완료', ()=>{ // 실행 취소: 미완료 복원 + 생성 회차 회수
+      t.status=t._prev||'next'; t.completedAt=null; t.updatedAt=Date.now();
+      if(nid){ state.tasks=state.tasks.filter(x=>x.id!==nid); if(!state.deletions)state.deletions={}; state.deletions[nid]=Date.now(); }
+      save(); render();
+    });
   }
   function delTask(id){
+    const t=state.tasks.find(x=>x.id===id);
     state.tasks=state.tasks.filter(x=>x.id!==id);
     if(!state.deletions)state.deletions={}; state.deletions[id]=Date.now(); // tombstone(동기화 병합용)
     save(); render();
+    if(t) toast(`'${t.title.length>18?t.title.slice(0,18)+'…':t.title}' 삭제됨`, ()=>{ // 실행 취소: 복원 + tombstone 해제
+      delete state.deletions[id]; t.updatedAt=Date.now(); state.tasks.push(t); save(); render();
+    });
   }
 
   // ---------- Time-box (Plan) view ----------
@@ -1236,20 +1259,32 @@
     grid.addEventListener('dragover',e=>{e.preventDefault();showDropIndic(e);});
     grid.addEventListener('dragleave',e=>{ if(e.target===grid) hideDropIndic(); });
     grid.addEventListener('drop',e=>{e.preventDefault();hideDropIndic();const id=e.dataTransfer.getData('text/plain');if(id)scheduleTask(id,calMin(e));});
+    // 겹침 레인: 일정+작업 블록을 합쳐 계산 → 겹치면 나란히 배치
+    const dayEvs=(state.events||[]).filter(ev=>!ev.allDay&&eventOccursOn(ev,planDate));
+    const dayBlocks=state.tasks.filter(t=>t.block&&t.block.date===planDate);
+    const lanes=assignLanes([
+      ...dayEvs.map(ev=>({start:ev.start,end:ev.start+ev.duration})),
+      ...dayBlocks.map(t=>({start:t.block.start,end:t.block.start+t.block.duration}))
+    ]);
+    const laneStyle=(card,li)=>{ // 좌측 56px=시간 라벨, 우측 8px 여백 → 가용폭을 레인 수로 균등 분할(.laned CSS)
+      card.dataset.lane=li.lane; card.dataset.lanes=li.lanes;
+      if(li.lanes>1){ card.classList.add('laned'); card.style.setProperty('--lane',li.lane); card.style.setProperty('--lanes',li.lanes); }
+    };
     // 일정 (정기 + 한 번) — 시간이 있는 것만 그리드에 표시 (종일은 상단 스트립)
-    (state.events||[]).filter(ev=>!ev.allDay&&eventOccursOn(ev,planDate)).forEach(ev=>{
+    dayEvs.forEach((ev,ei)=>{
       const top=minToTop(ev.start), height=Math.max(SNAP_MIN, ev.duration)*PX_PER_MIN-2;
       const tag=ev.freq==='once'?'':cic('repeat')+' ';
       const card=el(`<div class="event-card" style="top:${top}px;height:${height}px;border-left-color:${ev.color||'#0d9488'}">
         <div class="bc-main"><span class="time">${tag}${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}</span><span class="bc-title">${esc(ev.title)}</span></div>
       </div>`);
+      laneStyle(card, lanes[ei]);
       card.title=ev.title+' (일정 — 클릭하여 편집)';
       card.style.cursor='pointer';
       card.addEventListener('click',()=>openEvent(ev.id));
       grid.appendChild(card);
     });
     // 작업 블록
-    state.tasks.filter(t=>t.block&&t.block.date===planDate).forEach(t=>{
+    dayBlocks.forEach((t,bi)=>{
       const top=minToTop(t.block.start), height=Math.max(SNAP_MIN, t.block.duration)*PX_PER_MIN-2;
       const pc=t.priority<=2?`p${t.priority}`:'';
       const done=isDone(t);
@@ -1259,6 +1294,7 @@
         <button class="bc-x iconbtn" title="배치 해제">✕</button>
         <div class="block-resize" title="드래그하여 길이 조절"></div>
       </div>`);
+      laneStyle(card, lanes[dayEvs.length+bi]);
       card.addEventListener('dragstart',e=>{ if(resizing){e.preventDefault();return;} e.dataTransfer.setData('text/plain',t.id); const r=card.getBoundingClientRect(); dragOffsetMin=snapMin((e.clientY-r.top)/PX_PER_MIN); });
       card.addEventListener('dragend',()=>{dragOffsetMin=0;});
       card.querySelector('.bc-check').onclick=e=>{e.stopPropagation();toggleDone(t.id);};
@@ -1706,6 +1742,7 @@
     fillProjectSelect(t?t.projectId:(currentFilter&&currentFilter.type==='project'?currentFilter.value:''));
     $('#f-due').value=t?t.due||'':(currentView==='today'?todayStr():'');
     $('#f-duetime').value=t?t.dueTime||'':'';
+    $('#f-repeat').value=t?(t.repeat||''):'';
     $('#f-tags').value=t?(t.tags||[]).join(', '):(currentFilter&&currentFilter.type==='tag'?currentFilter.value:'');
     $('#f-estimate').value=t?(t.estimate||''):'';
     setPrio(t?t.priority:4);
@@ -1743,7 +1780,7 @@
     const due=$('#f-due').value||null;
     const subtasks=editSubtasks.filter(s=>s.title.trim()).map(s=>({id:s.id,title:s.title.trim(),done:!!s.done}));
     const data={title,notes:$('#f-notes').value.trim(),status:$('#f-status').value,
-      projectId:$('#f-project').value,due,dueTime:due?($('#f-duetime').value||null):null,tags,priority:selectedPrio,weight:selectedWeight,
+      projectId:$('#f-project').value,due,dueTime:due?($('#f-duetime').value||null):null,repeat:$('#f-repeat').value||null,tags,priority:selectedPrio,weight:selectedWeight,
       estimate:(+$('#f-estimate').value||null),block,subtasks};
     if(editingId){ const t=state.tasks.find(x=>x.id===editingId); Object.assign(t,data); t.updatedAt=Date.now(); }
     else { state.tasks.push({id:uid(),...data,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null}); }
@@ -2498,9 +2535,11 @@
       }
     }catch(err){ console.warn(err); if(manual) alert('불러오기 실패: '+(err.message||err)); }
   }
-  function toast(msg){
-    const t=el(`<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:24px;font-size:14px;z-index:99;box-shadow:var(--shadow)">${esc(msg)}</div>`);
-    document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
+  function toast(msg, undo){ // undo: 실행 취소 콜백(있으면 버튼 표시, 더 오래 유지)
+    document.querySelectorAll('.toast').forEach(x=>x.remove()); // 한 번에 하나만(차분)
+    const t=el(`<div class="toast">${esc(msg)}${undo?`<button class="toast-undo">실행 취소</button>`:''}</div>`);
+    if(undo) t.querySelector('.toast-undo').onclick=()=>{ t.remove(); undo(); };
+    document.body.appendChild(t); setTimeout(()=>t.remove(), undo?5000:2200);
   }
 
   // ---------- Helpers (el·esc·$ 등 순수 헬퍼는 helpers.js) ----------

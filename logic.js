@@ -15,6 +15,34 @@ function sortTasks(ts){
 
 // '지금 이 틈' 추천 점수 (틈 적합도 + 마감 긴급도 + 우선순위)
 function daysUntil(due){ if(!due) return null; return Math.round((parseDS(due)-parseDS(todayStr()))/86400000); }
+// 반복 할 일 — 다음 회차 마감일. monthly는 말일 클램프(1/31 → 2/28).
+function nextRepeatDate(repeat, fromDS){
+  if(repeat==='daily') return addDaysDS(fromDS,1);
+  if(repeat==='weekly') return addDaysDS(fromDS,7);
+  if(repeat==='monthly'){
+    const d=parseDS(fromDS), day=d.getDate();
+    const last=new Date(d.getFullYear(), d.getMonth()+2, 0).getDate(); // 다음 달 말일
+    return todayStr(new Date(d.getFullYear(), d.getMonth()+1, Math.min(day,last)));
+  }
+  return null;
+}
+// 타임박스 겹침 — 시간 구간들을 겹침 클러스터별로 레인 배정(나란히 배치용).
+// items: [{start,end}](분) → [{lane, lanes}] (lanes = 그 클러스터의 총 레인 수)
+function assignLanes(items){
+  const order=[...items.keys()].sort((a,b)=>items[a].start-items[b].start || items[b].end-items[a].end);
+  const res=items.map(()=>({lane:0,lanes:1}));
+  let cluster=[], laneEnd=[], clusterEnd=0;
+  const flush=()=>{ cluster.forEach(i=>res[i].lanes=laneEnd.length); cluster=[]; laneEnd=[]; clusterEnd=0; };
+  order.forEach(i=>{
+    const s=items[i].start, e=items[i].end;
+    if(cluster.length && s>=clusterEnd) flush();      // 이전 클러스터와 안 겹침 → 확정
+    let l=0; while(laneEnd[l]!=null && laneEnd[l]>s) l++; // 끝==시작은 겹침 아님
+    laneEnd[l]=e; res[i].lane=l; cluster.push(i);
+    clusterEnd=Math.max(clusterEnd,e);
+  });
+  flush();
+  return res;
+}
 // 마감 근접도 → 강조 단계(가까울수록 진하게). urgencyScore와 동일 버킷.
 function dueLevel(due){
   const d=daysUntil(due);
