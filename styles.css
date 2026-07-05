@@ -517,7 +517,8 @@ input,textarea,select{font-family:inherit}
 .field label{font-size:12px;color:var(--muted);font-weight:600}
 .field input,.field textarea,.field select{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:10px;padding:10px 12px;font-size:14px;outline:none}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
-.row{display:flex;gap:10px}.row>*{flex:1}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0} /* min-width:0 — 내부 고정폭 컨트롤이 있어도 옆 필드를 밀어내지 않게 */
+.due-controls{display:flex;gap:8px;flex-wrap:wrap} /* 좁으면 반복 셀렉트가 다음 줄로 자연 개행 */
 .prio-pick{display:flex;gap:8px}
 .prio-pick button{flex:1;border:1px solid var(--border);background:var(--panel-2);border-radius:10px;padding:8px;font-size:13px;color:var(--muted)}
 .prio-pick button.sel{color:#fff;border-color:transparent}
@@ -601,6 +602,7 @@ pre{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;
 @media (max-width:520px){
   #newTaskBtn{font-size:0;padding:9px 12px}
   #newTaskBtn::after{content:'＋';font-size:18px}
+  .modal .row{flex-direction:column;gap:12px} /* 모바일: 모달 폼은 한 열로 스택 — 밀림·삐짐 방지 */
 }
 .menu-btn{display:none}
 

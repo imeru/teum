@@ -171,10 +171,10 @@
       <div class="row">
         <div class="field">
           <label>마감일 / 시간 / 반복</label>
-          <div style="display:flex;gap:8px">
-            <input id="f-due" type="date" style="flex:1;min-width:0" />
-            <input id="f-duetime" type="time" style="flex:0 0 108px" />
-            <select id="f-repeat" style="flex:0 0 88px" title="완료하면 다음 회차가 자동 생성됩니다">
+          <div class="due-controls">
+            <input id="f-due" type="date" style="flex:1 1 130px;min-width:0" />
+            <input id="f-duetime" type="time" style="flex:0 1 108px;min-width:88px" />
+            <select id="f-repeat" style="flex:0 0 auto" title="완료하면 다음 회차가 자동 생성됩니다">
               <option value="">반복 없음</option>
               <option value="daily">매일</option>
               <option value="weekly">매주</option>
@@ -182,6 +182,8 @@
             </select>
           </div>
         </div>
+      </div>
+      <div class="row">
         <div class="field">
           <label>태그 (쉼표 구분)</label>
           <input id="f-tags" placeholder="@집, @연구, 30분" />
