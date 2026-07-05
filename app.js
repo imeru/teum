@@ -2188,12 +2188,14 @@
     const pd=dedupe(state.projects||[], x=>['P',x.name||'',x.color||''].join('|'));
     const md=dedupe(state.memos||[], x=>['M',x.title||'',x.body||'',x.folderId||''].join('|'));
     const fd=dedupe(state.folders||[], x=>['F',x.name||''].join('|'));
+    // 일정도 내용 기준(제목+시간+반복 규칙) — 예전 union 병합 버그로 생긴 중복 제거
+    const ed=dedupe(state.events||[], x=>['E',x.title||'',x.start!=null?x.start:'',x.duration||'',x.freq||'',(x.days||[]).join(','),x.startDate||'',x.endMode||'',x.endDate||'',x.monthMode||'',x.ordinal!=null?x.ordinal:'',x.weekday!=null?x.weekday:'',x.allDay?1:0].join('|'));
     // 제거된 프로젝트를 가리키던 할 일을 유지된 프로젝트로 재매핑
     const projRemap={}; pd.removed.forEach(r=>{ projRemap[r.id]=pd.firstId[['P',r.name||'',r.color||''].join('|')]; });
     td.kept.forEach(t=>{ if(t.projectId&&projRemap[t.projectId]) t.projectId=projRemap[t.projectId]; });
-    const removedAll=[...td.removed,...pd.removed,...md.removed,...fd.removed];
+    const removedAll=[...td.removed,...pd.removed,...md.removed,...fd.removed,...ed.removed];
     removedAll.forEach(x=>{ state.deletions[x.id]=Date.now(); });
-    state.tasks=td.kept; state.projects=pd.kept; state.memos=md.kept; state.folders=fd.kept;
+    state.tasks=td.kept; state.projects=pd.kept; state.memos=md.kept; state.folders=fd.kept; state.events=ed.kept;
     if(removedAll.length){ save(); render(); }
     return removedAll.length;
   }
@@ -2449,7 +2451,7 @@
         <button class="btn" id="dedup">중복 정리</button>
         <button class="btn" id="rst" style="color:var(--p1)">초기화</button>
       </div>
-      <div class="note">‘중복 정리’: 제목·내용이 완전히 같은 할 일·메모·프로젝트를 하나만 남기고 정리합니다(동기화로 생긴 중복 제거).</div>
+      <div class="note">‘중복 정리’: 제목·내용이 완전히 같은 할 일·메모·프로젝트·일정을 하나만 남기고 정리합니다(동기화로 생긴 중복 제거).</div>
       <input type="file" id="impFile" accept="application/json" style="display:none">
     </div>`);
     card.querySelector('#exp').onclick=exportJson;

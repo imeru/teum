@@ -792,6 +792,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       { id: 'mm1', title: '캠핑', body: '가스', color: '', createdAt: 100, updatedAt: 1 },
       { id: 'mm2', title: '캠핑', body: '가스', color: '', createdAt: 200, updatedAt: 1 },
     ],
+    events: [
+      { id: 'ev1', title: '캠핑', allDay: true, freq: 'once', startDate: '2026-06-29', endDate: '2026-07-03', createdAt: 100, updatedAt: 1 },
+      { id: 'ev2', title: '캠핑', allDay: true, freq: 'once', startDate: '2026-06-29', endDate: '2026-07-03', createdAt: 200, updatedAt: 1 },
+      { id: 'ev3', title: '주간 회의', start: 600, duration: 60, freq: 'weekly', days: [1], startDate: '2026-06-01', createdAt: 300, updatedAt: 1 },
+      { id: 'ev4', title: '주간 회의', start: 600, duration: 60, freq: 'weekly', days: [2], startDate: '2026-06-01', createdAt: 400, updatedAt: 1 },
+    ],
   }));
   // p2를 가리키는 할 일이 있다고 가정하고 재매핑 확인용으로 a3에 p2 부여
   const st0 = JSON.parse(localStorage.getItem('flowdo.state.v1')); st0.tasks[2].projectId = 'p2'; localStorage.setItem('flowdo.state.v1', JSON.stringify(st0));
@@ -804,6 +810,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('메모 중복 제거(2→1)', st.memos.length === 1);
   ck('제거 항목 tombstone 기록', !!(st.deletions && (st.deletions.a2 || st.deletions.p2 || st.deletions.mm2)));
   ck('제거된 프로젝트 참조 재매핑', !st.tasks.some(t => t.projectId === 'p2'));
+  ck('일정 중복 제거(같은 내용 2→1)', st.events.filter(e => e.title === '캠핑').length === 1 && !!st.deletions.ev2);
+  ck('요일 다른 정기 일정은 유지', st.events.filter(e => e.title === '주간 회의').length === 2);
 }
 
 // ───────────────────────── 에너지/집중도 기반 추천 ─────────────────────────
