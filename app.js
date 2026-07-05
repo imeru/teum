@@ -1260,7 +1260,8 @@
   }
   function addPoolGroup(pool,label,list){
     if(!list.length) return;
-    pool.appendChild(el(`<div class="pool-group-title"><span>${label}</span><span class="pg-count">${list.length}</span></div>`));
+    const remain=list.filter(t=>!isDone(t)).length; // 남은(미완료) 개수만 — 전부 완료면 숫자 없이 취소선만
+    pool.appendChild(el(`<div class="pool-group-title"><span>${label}</span><span class="pg-count">${remain||''}</span></div>`));
     list.forEach(t=>{
       const pc=t.priority<=3?`p${t.priority}`:'';
       const done=isDone(t);

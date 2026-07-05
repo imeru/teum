@@ -1373,6 +1373,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('어제 완료분은 오늘 풀에 없음', !poolText.includes('어제완료한밀린일'));
   ck('오늘 완료분은 취소선으로 남음', !!$$('.pool-task.done').find(c=>c.textContent.includes('오늘완료한일')));
   ck('그룹 개수 분리(.pg-count)', $$('.pool-group-title .pg-count').length>=1);
+  // 그룹 개수는 미완료만 — '오늘 할 일'(완료 1개뿐)은 빈 카운트, '다음 할 일 (GTD)'는 1
+  const headOf = label => $$('.pool-group-title').find(h=>h.textContent.includes(label));
+  ck('전부 완료된 그룹은 숫자 숨김', headOf('오늘 할 일') && headOf('오늘 할 일').querySelector('.pg-count').textContent==='');
+  ck('미완료 그룹은 남은 수 표시', headOf('다음 할 일') && headOf('다음 할 일').querySelector('.pg-count').textContent==='1');
   ck('런타임 에러 없음(풀 노출)', !getErr());
 }
 
