@@ -1232,8 +1232,9 @@
       pool.appendChild(banner);
     }
     const isDatedFor=t=>!!(t.due&&(isOverdue(t.due)||t.due===planDate));
-    // 완료한 '오늘/예정' 할 일은 숨기지 않고 취소선으로 남겨 캘린더와 연동 표시
-    const doneDated=state.tasks.filter(t=>isDone(t)&&notBoxedHere(t)&&!top3ids.includes(t.id)&&isDatedFor(t));
+    // 완료 항목은 '그날 완료한 것'만 그날 풀에 취소선으로 — 밀린 마감이어도 완료했으면 다른 날짜에 남지 않음
+    const doneOn=t=>{ const ts=t.completedAt||0; return !!ts && todayStr(new Date(ts))===planDate; };
+    const doneDated=state.tasks.filter(t=>isDone(t)&&notBoxedHere(t)&&!top3ids.includes(t.id)&&doneOn(t));
     const dated=sortTasks(avail.filter(isDatedFor).concat(doneDated));
     const undated=sortTasks(avail.filter(t=>!isDatedFor(t)));
     addPoolGroup(pool, planDate===todayStr()?'오늘 할 일':'예정 할 일', dated);
@@ -1259,7 +1260,7 @@
   }
   function addPoolGroup(pool,label,list){
     if(!list.length) return;
-    pool.appendChild(el(`<div class="pool-group-title">${label} <span style="color:var(--muted)">${list.length}</span></div>`));
+    pool.appendChild(el(`<div class="pool-group-title"><span>${label}</span><span class="pg-count">${list.length}</span></div>`));
     list.forEach(t=>{
       const pc=t.priority<=3?`p${t.priority}`:'';
       const done=isDone(t);

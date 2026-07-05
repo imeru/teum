@@ -1359,6 +1359,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음', !getErr());
 }
 
+// ───────────────────────── 32) 풀 완료 노출 규칙 + 그룹 개수 분리 ─────────────────────────
+{
+  section('풀 완료 노출');
+  const yMs = Date.now() - 86400000; // 어제 완료
+  const { $, $$, getErr } = boot(baseState({ tasks: [
+    { id:'yd', title:'어제완료한밀린일', status:'done', priority:3, due:fmt(new Date(yMs)), completedAt:yMs, tags:[], createdAt:1, updatedAt:1 },
+    { id:'td', title:'오늘완료한일', status:'done', priority:3, due:todayDS, completedAt:Date.now(), tags:[], createdAt:2, updatedAt:1 },
+    { id:'nx', title:'미완료다음일', status:'next', priority:3, tags:[], createdAt:3, updatedAt:1 },
+  ] }), { planview:'day' });
+  $('.nav[data-view="plan"]').click();
+  const poolText = $('#pool').textContent;
+  ck('어제 완료분은 오늘 풀에 없음', !poolText.includes('어제완료한밀린일'));
+  ck('오늘 완료분은 취소선으로 남음', !!$$('.pool-task.done').find(c=>c.textContent.includes('오늘완료한일')));
+  ck('그룹 개수 분리(.pg-count)', $$('.pool-group-title .pg-count').length>=1);
+  ck('런타임 에러 없음(풀 노출)', !getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
