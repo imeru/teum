@@ -1308,6 +1308,57 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음(GTD 오늘)', !getErr());
 }
 
+// ───────────────────────── 30) 완료 뷰 날짜별 그룹 ─────────────────────────
+{
+  section('완료 그룹');
+  const now = Date.now();
+  const { $, $$, getErr } = boot(baseState({
+    tasks: [
+      { id: 'd2', title: '사흘전 완료한 일', status: 'done', priority: 3, completedAt: now - 3 * 86400000, tags: [], createdAt: 1, updatedAt: 1 },
+      { id: 'd1', title: '오늘 완료한 일', status: 'done', priority: 3, completedAt: now, tags: [], createdAt: 1, updatedAt: 1 },
+    ],
+  }));
+  $('.nav[data-view="done"]').click();
+  ck('런타임 에러 없음', !getErr());
+  const heads = $$('.list-group-title');
+  ck('그룹 헤더 2개', heads.length === 2);
+  ck('첫 헤더 = 오늘', heads[0] && heads[0].textContent.includes('오늘'));
+  ck('둘째 헤더 = M월 D일 형식', heads[1] && /\d{1,2}월 \d{1,2}일/.test(heads[1].textContent));
+  ck('헤더에 완료 개수 표시', heads[0] && heads[0].querySelector('.lg-count') && heads[0].querySelector('.lg-count').textContent === '1');
+  const titles = $$('.task-title').map(e => e.textContent);
+  ck('오늘 완료 카드 존재', titles.some(t => t.includes('오늘 완료한 일')));
+  ck('사흘전 완료 카드 존재', titles.some(t => t.includes('사흘전 완료한 일')));
+  // 최신순: 오늘 그룹이 이전 날짜 그룹보다 먼저
+  const html = $('#content').innerHTML;
+  ck('오늘 그룹이 먼저(최신순)', html.indexOf('오늘 완료한 일') !== -1 && html.indexOf('오늘 완료한 일') < html.indexOf('사흘전 완료한 일'));
+}
+
+// ───────────────────────── 31) 검색 범위 칩 (전체|할 일|메모) ─────────────────────────
+{
+  section('검색 범위 칩');
+  const { $, $$, getErr } = boot(baseState({
+    tasks: [{ id: 't1', title: '회의 준비', status: 'next', priority: 3, notes: '', tags: [], createdAt: 1, updatedAt: 1 }],
+    memos: [{ id: 'm1', title: '회의록', body: '논의 내용 정리', html: '', color: '', folderId: null, pinned: false, trashedAt: null, createdAt: 1, updatedAt: 1 }],
+  }));
+  $('.nav[data-view="search"]').click();
+  ck('범위 칩 3개', $$('#searchScope button').length === 3);
+  ck('기본 선택 = 전체', $('#searchScope button.sel') && $('#searchScope button.sel').dataset.s === 'all');
+  const type = v => { const i = $('#searchInput'); i.value = v; i.dispatchEvent(new (i.ownerDocument.defaultView).Event('input', { bubbles: true })); };
+  const txt = () => $('#searchResults').textContent;
+  const chip = s => $$('#searchScope button').find(b => b.dataset.s === s);
+  type('회의');
+  ck('전체: 할 일 그룹 표시', $$('.search-group').some(g => g.textContent.includes('할 일')) && txt().includes('회의 준비'));
+  ck('전체: 메모 그룹 표시', $$('.search-group').some(g => g.textContent.includes('메모')) && txt().includes('회의록'));
+  chip('memo').click();
+  ck('메모 선택: 할 일 그룹 숨김', !$$('.search-group').some(g => g.textContent.includes('할 일')) && !txt().includes('회의 준비'));
+  ck('메모 선택: 메모 그룹 표시', $$('.search-group').some(g => g.textContent.includes('메모')) && txt().includes('회의록'));
+  chip('task').click();
+  ck('할 일 선택: 메모 숨김·할 일 표시', !txt().includes('회의록') && txt().includes('회의 준비'));
+  chip('all').click();
+  ck('전체 복귀: 둘 다 표시', txt().includes('회의 준비') && txt().includes('회의록'));
+  ck('런타임 에러 없음', !getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

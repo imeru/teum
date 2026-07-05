@@ -209,7 +209,11 @@
     $('#viewTitle').textContent=title;
     $('#viewSub').textContent=sub;
 
-    tasks=sortTasks(tasks);
+    // 완료 뷰(필터 없음)는 완료 시각 내림차순 → 날짜별 그룹으로 표시
+    const doneGrouped = currentView==='done' && !currentFilter;
+    tasks = doneGrouped
+      ? tasks.slice().sort((a,b)=>(b.completedAt||b.updatedAt||0)-(a.completedAt||a.updatedAt||0))
+      : sortTasks(tasks);
     content.innerHTML='';
     // 완료 뷰는 보관 목적이라 빠른 추가 바를 두지 않음
     if(currentView!=='done') content.appendChild(quickAddBar());
@@ -227,9 +231,35 @@
       content.appendChild(el(`<div class="empty"><img class="brand-logo" src="icons/teum-logo-horizontal.svg" alt="TEUM" />${emptyMsg}</div>`));
       return;
     }
+    if(doneGrouped){ renderDoneGroups(tasks); return; }
     const list=el('<div class="tasklist"></div>');
     tasks.forEach(t=>list.appendChild(taskRow(t)));
     content.appendChild(list);
+  }
+
+  // ---------- 완료 뷰: 완료 날짜별 그룹 ----------
+  function doneGroupLabel(ds){
+    const t=todayStr();
+    if(ds===t) return '오늘';
+    if(ds===addDaysDS(t,-1)) return '어제';
+    const d=parseDS(ds);
+    return `${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
+  }
+  // tasks는 완료 시각 내림차순 — 삽입 순서가 곧 날짜 내림차순, 시각 없는 항목('이전')은 맨 아래.
+  function renderDoneGroups(tasks){
+    const groups=new Map(); // 'YYYY-MM-DD' | ''(이전) → tasks
+    tasks.forEach(t=>{
+      const ts=t.completedAt||t.updatedAt||0;
+      const key=ts?todayStr(new Date(ts)):'';
+      if(!groups.has(key)) groups.set(key,[]);
+      groups.get(key).push(t);
+    });
+    groups.forEach((items,key)=>{
+      content.appendChild(el(`<div class="list-group-title"><span>${esc(key?doneGroupLabel(key):'이전')}</span><span class="lg-count">${items.length}</span></div>`));
+      const list=el('<div class="tasklist"></div>');
+      items.forEach(t=>list.appendChild(taskRow(t)));
+      content.appendChild(list);
+    });
   }
 
   // ---------- 메모 (참고용 노트 — 완료 개념 없이 계속 보존) ----------
@@ -2209,21 +2239,33 @@
     content.innerHTML='';
     const wrap=el(`<div class="search-view">
       <div class="search-bar">${svgIco('search')}<input id="searchInput" type="search" placeholder="할 일·메모 검색…" autocomplete="off" /></div>
+      <div class="gap-chips" id="searchScope">
+        <button data-s="all" class="sel">전체</button>
+        <button data-s="task">할 일</button>
+        <button data-s="memo">메모</button>
+      </div>
       <div id="searchResults"></div>
     </div>`);
     content.appendChild(wrap);
     const input=wrap.querySelector('#searchInput');
     input.value=searchQuery;
-    input.addEventListener('input',()=>{ searchQuery=input.value; renderSearchResults(); });
-    renderSearchResults();
+    let scope='all'; // 검색 범위 — 비영속, 뷰 재진입 시 '전체'로 초기화
+    const chipBtns=[...wrap.querySelectorAll('#searchScope button')];
+    chipBtns.forEach(b=>b.onclick=()=>{
+      scope=b.dataset.s;
+      chipBtns.forEach(x=>x.classList.toggle('sel',x===b));
+      renderSearchResults(scope);
+    });
+    input.addEventListener('input',()=>{ searchQuery=input.value; renderSearchResults(scope); });
+    renderSearchResults(scope);
     setTimeout(()=>input.focus(),50);
   }
-  function renderSearchResults(){
+  function renderSearchResults(scope='all'){
     const host=$('#searchResults'); if(!host) return; host.innerHTML='';
     const q=searchQuery.trim().toLowerCase();
     if(!q){ host.appendChild(el(`<div class="empty"><div class="big">${svgIco('search')}</div>할 일과 메모를 한 번에 찾습니다.</div>`)); return; }
-    const taskHits=sortTasks(state.tasks.filter(t=>searchMatch(q,[t.title,t.notes,(t.tags||[]).join(' '),(t.subtasks||[]).map(s=>s.title).join(' ')])));
-    const memoHits=(state.memos||[]).filter(m=>!m.trashedAt&&searchMatch(q,[m.title,memoHtmlToText(m.body||'')]));
+    const taskHits=scope==='memo'?[]:sortTasks(state.tasks.filter(t=>searchMatch(q,[t.title,t.notes,(t.tags||[]).join(' '),(t.subtasks||[]).map(s=>s.title).join(' ')])));
+    const memoHits=scope==='task'?[]:(state.memos||[]).filter(m=>!m.trashedAt&&searchMatch(q,[m.title,memoHtmlToText(m.body||'')]));
     if(!taskHits.length&&!memoHits.length){ host.appendChild(el(`<div class="empty">'${esc(searchQuery.trim())}'에 대한 결과가 없습니다.</div>`)); return; }
     if(taskHits.length){
       host.appendChild(el(`<div class="search-group">할 일 <span>${taskHits.length}</span></div>`));
