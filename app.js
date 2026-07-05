@@ -2441,7 +2441,7 @@
     const mo=state.settings.keepMonths;
     const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
       <strong>${svgIco('save')} 데이터 정리 · 자동 백업</strong>
-      <div class="note">완료 후 오래된 할 일·뽀모도로 기록(아래 기준)과 <b>종료 후 5년</b> 지난 일정은 보관함으로 옮겨 동기화를 가볍게 유지합니다. 보관함은 이 기기와 서버(:arc)에 남고, 전체 상태 스냅샷은 주 1회 서버에 자동 저장됩니다(최근 4개).</div>
+      <div class="note">완료 후 오래된 할 일·뽀모도로 기록(아래 기준)과 <b>종료 후 5년</b> 지난 일정은 보관함으로 옮겨 동기화를 가볍게 유지합니다. 보관함은 이 기기와 서버에 남습니다. 복구용 전체 백업(스냅샷)은 주 1회 자동 저장되며, 최근 4주분만 유지되고 더 오래된 백업은 자동 삭제됩니다.</div>
       <div class="row" style="align-items:flex-end">
         <div class="field"><label>완료 항목 보관 기준</label>
           <select id="dd-keep">${[[3,'3개월 지나면 보관'],[6,'6개월 지나면 보관 (권장)'],[12,'12개월 지나면 보관'],[0,'자동 보관 안 함']].map(([v,l])=>`<option value="${v}" ${mo===v?'selected':''}>${l}</option>`).join('')}</select>
