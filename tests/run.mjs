@@ -1283,6 +1283,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음(설정)', !b.getErr());
 }
 
+// ───────────────────────── 29) GTD 카드 원탭 '오늘' (모바일 대안) ─────────────────────────
+{
+  section('GTD 오늘 버튼');
+  const { $, $$, window: W, getErr } = boot(baseState({ tasks: [
+    { id:'w', title:'대기일', status:'waiting', priority:3, tags:[], createdAt:1, updatedAt:1 },
+    { id:'t', title:'이미오늘', status:'next', priority:3, due:todayDS, tags:[], createdAt:2, updatedAt:1 },
+  ] }), { lastview: 'gtdboard' });
+  const cardOf = title => $$('.gtdb-card').find(c=>c.textContent.includes(title));
+  ck('카드에 오늘 버튼', !!cardOf('대기일').querySelector('.gc-today'));
+  ck('이미 오늘이면 버튼 숨김', !cardOf('이미오늘').querySelector('.gc-today'));
+  cardOf('대기일').querySelector('.gc-today').click();
+  const st = JSON.parse(W.localStorage.getItem('flowdo.state.v1'));
+  ck('탭 → 마감 오늘 + next 승격', st.tasks.find(x=>x.id==='w').due===todayDS && st.tasks.find(x=>x.id==='w').status==='next');
+  ck('처리 후 버튼 사라짐(오늘이므로)', !cardOf('대기일').querySelector('.gc-today'));
+  ck('런타임 에러 없음(GTD 오늘)', !getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

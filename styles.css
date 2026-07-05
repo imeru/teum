@@ -491,6 +491,9 @@ input,textarea,select{font-family:inherit}
 .gtdb-card.overdue{border-color:var(--red)}
 .gc-title{display:flex;align-items:center;gap:6px;font-size:14px;line-height:1.35}
 .gc-title .gc-t{flex:1}
+.gc-today{padding:3px;color:var(--muted);flex:0 0 auto}
+.gc-today .cic{width:15px;height:15px}
+.gc-today:hover{color:var(--accent)}
 .gc-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .gc-meta:empty{display:none}
 .rv-sec textarea{width:100%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;padding:10px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box}

@@ -713,6 +713,15 @@
     card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);card.classList.add('dragging');});
     card.addEventListener('dragend',()=>card.classList.remove('dragging'));
     card.querySelector('.gc-title').addEventListener('click',()=>openTask(t.id));
+    // 모바일(터치)엔 드래그가 없음 → 원탭 '오늘 할 일로' 버튼 (이미 오늘이면 숨김)
+    if(t.due!==todayStr()){
+      const b=el(`<button class="iconbtn gc-today" title="오늘 할 일로" aria-label="오늘 할 일로">${cic('today')}</button>`);
+      b.onclick=e=>{ e.stopPropagation();
+        t.due=todayStr(); if(t.status!=='next') t.status='next'; t.updatedAt=Date.now();
+        save(); renderGtdBoard(); renderSidebarCounts(); toast('오늘 할 일에 추가했어요');
+      };
+      card.querySelector('.gc-title').appendChild(b);
+    }
     return card;
   }
   function renderGtdBoard(){
