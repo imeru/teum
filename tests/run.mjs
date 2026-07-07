@@ -1380,6 +1380,43 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음(풀 노출)', !getErr());
 }
 
+// ───────────────────────── 33) 짧은 블록 compact/tiny 레이아웃 ─────────────────────────
+{
+  section('짧은 블록 레이아웃');
+  const { $, $$, getErr } = boot(baseState({
+    tasks: [
+      { id:'b60', title:'한시간블록', status:'next', priority:3, block:{date:todayDS,start:540,duration:60}, tags:[], createdAt:1, updatedAt:1 },
+      { id:'b30', title:'삼십분블록', status:'next', priority:3, block:{date:todayDS,start:660,duration:30}, tags:[], createdAt:2, updatedAt:1 },
+      { id:'b10', title:'아주짧은블록', status:'next', priority:3, block:{date:todayDS,start:780,duration:10}, tags:[], createdAt:3, updatedAt:1 },
+    ],
+    events: [ { id:'e30', title:'삼십분일정', start:900, duration:30, color:'#0d9488', freq:'once', startDate:todayDS, endMode:'never', days:[], interval:1 } ],
+  }), { planview:'day' });
+  $('.nav[data-view="plan"]').click();
+  const blkOf = t => $$('.block-card').find(c=>c.textContent.includes(t));
+  ck('60분 블록은 기본(두 줄)', blkOf('한시간블록') && !blkOf('한시간블록').classList.contains('compact'));
+  ck('30분 블록 = compact', blkOf('삼십분블록') && blkOf('삼십분블록').classList.contains('compact') && !blkOf('삼십분블록').classList.contains('tiny'));
+  ck('10분 블록 = tiny(제목만)', blkOf('아주짧은블록') && blkOf('아주짧은블록').classList.contains('tiny'));
+  const ev = $$('.event-card').find(c=>c.textContent.includes('삼십분일정'));
+  ck('30분 일정도 compact', !!ev && ev.classList.contains('compact'));
+  ck('블록 title 툴팁(전문 확인)', blkOf('삼십분블록').title === '삼십분블록');
+  ck('런타임 에러 없음(compact)', !getErr());
+}
+
+// ───────────────────────── 34) 사이드바 '오늘 할 일' 드롭 → next 승격 ─────────────────────────
+{
+  section('오늘 드롭 승격');
+  const { $, window: W, getErr } = boot(baseState({ tasks: [
+    { id:'ib1', title:'수집함카드', status:'inbox', priority:3, tags:[], createdAt:1, updatedAt:1 },
+  ] }));
+  const dt = { getData: () => 'ib1', setData: () => {} };
+  const drop = new W.Event('drop', { bubbles: true }); drop.preventDefault = () => {}; drop.dataTransfer = dt;
+  $('.nav[data-view="today"]').dispatchEvent(drop);
+  const t = JSON.parse(W.localStorage.getItem('flowdo.state.v1')).tasks.find(x=>x.id==='ib1');
+  ck('Inbox 드롭 → 다음 할일 승격', t.status==='next');
+  ck('Inbox 드롭 → 마감 오늘', t.due===todayDS);
+  ck('런타임 에러 없음(오늘 드롭)', !getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

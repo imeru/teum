@@ -1313,10 +1313,12 @@
       if(li.lanes>1){ card.classList.add('laned'); card.style.setProperty('--lane',li.lane); card.style.setProperty('--lanes',li.lanes); }
     };
     // 일정 (정기 + 한 번) — 시간이 있는 것만 그리드에 표시 (종일은 상단 스트립)
+    // 짧은 블록은 두 줄이 안 들어감 → 한 줄(compact), 아주 짧으면 제목만(tiny). 글자 축소 대신 레이아웃 전환.
+    const sizeCls=h=> h<22?'compact tiny':(h<44?'compact':'');
     dayEvs.forEach((ev,ei)=>{
       const top=minToTop(ev.start), height=Math.max(SNAP_MIN, ev.duration)*PX_PER_MIN-2;
       const tag=ev.freq==='once'?'':cic('repeat')+' ';
-      const card=el(`<div class="event-card" style="top:${top}px;height:${height}px;border-left-color:${ev.color||'#0d9488'}">
+      const card=el(`<div class="event-card ${sizeCls(height)}" style="top:${top}px;height:${height}px;border-left-color:${ev.color||'#0d9488'}">
         <div class="bc-main"><span class="time">${tag}${minToHHMM(ev.start)}~${minToHHMM(ev.start+ev.duration)}</span><span class="bc-title">${esc(ev.title)}</span></div>
       </div>`);
       laneStyle(card, lanes[ei]);
@@ -1330,12 +1332,13 @@
       const top=minToTop(t.block.start), height=Math.max(SNAP_MIN, t.block.duration)*PX_PER_MIN-2;
       const pc=t.priority<=2?`p${t.priority}`:'';
       const done=isDone(t);
-      const card=el(`<div class="block-card ${pc} ${done?'done':''}" draggable="true" style="top:${top}px;height:${height}px">
+      const card=el(`<div class="block-card ${pc} ${done?'done':''} ${sizeCls(height)}" draggable="true" style="top:${top}px;height:${height}px">
         <button class="bc-check ${done?'on':''}" title="${done?'완료 취소':'완료 표시'}" aria-label="${done?'완료 취소':'완료 표시'}">${done?cic('done'):''}</button>
         <div class="bc-main"><span class="time">${minToHHMM(t.block.start)}~${minToHHMM(t.block.start+t.block.duration)}</span><span class="bc-title">${esc(t.title)}${subBadgeHTML(t)}</span></div>
         <button class="bc-x iconbtn" title="배치 해제">✕</button>
         <div class="block-resize" title="드래그하여 길이 조절"></div>
       </div>`);
+      card.title=t.title;
       laneStyle(card, lanes[dayEvs.length+bi]);
       card.addEventListener('dragstart',e=>{ if(resizing){e.preventDefault();return;} e.dataTransfer.setData('text/plain',t.id); const r=card.getBoundingClientRect(); dragOffsetMin=snapMin((e.clientY-r.top)/PX_PER_MIN); });
       card.addEventListener('dragend',()=>{dragOffsetMin=0;});
@@ -2728,7 +2731,7 @@
 
   // ---------- Events ----------
   const navDropActions={
-    today:t=>{ t.due=todayStr(); t.completedAt=null; if(t.status==='done') t.status=t._prev||'next'; },
+    today:t=>{ t.due=todayStr(); t.completedAt=null; if(t.status!=='next') t.status='next'; }, // 오늘로 끌면 GTD '다음 할일'로 자동 승격(Inbox·대기·언젠가·완료 모두)
     inbox:t=>{ t.status='inbox'; t.completedAt=null; },
     next:t=>{ t.status='next'; t.completedAt=null; },
     waiting:t=>{ t.status='waiting'; t.completedAt=null; },

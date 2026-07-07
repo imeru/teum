@@ -272,6 +272,21 @@ input,textarea,select{font-family:inherit}
 .block-card.done{opacity:.6;border-left-color:var(--green)}
 .block-card.done .bc-title{text-decoration:line-through;color:var(--muted)}
 .block-card.done .time{color:var(--muted)}
+/* 짧은 블록: 두 줄 대신 한 줄(compact) — 글자 축소 없이 레이아웃 전환. 아주 짧으면 제목만(tiny). */
+.block-card.compact,.event-card.compact{padding:0 8px;display:flex;align-items:center}
+.block-card.compact .bc-main,.event-card.compact .bc-main{flex-direction:row;align-items:center;justify-content:flex-start;gap:7px;width:100%}
+.block-card.compact .bc-title,.event-card.compact .bc-title{flex:1;min-width:0}
+.block-card.compact .bc-check{width:14px;height:14px}
+.block-card.compact .bc-check .cic{width:9px;height:9px}
+.block-card.compact .bc-main{padding-left:20px}
+.block-card.compact .block-resize{height:6px}
+.block-card.compact .block-resize::after{bottom:1px;height:2px}
+.event-card.tiny .time,.block-card.tiny .time{display:none}
+.block-card.tiny,.event-card.tiny{padding:0 6px}
+.block-card.tiny .bc-title,.event-card.tiny .bc-title{font-size:11px}
+.block-card.tiny .bc-check{display:none}
+.block-card.tiny .bc-main{padding-left:0}
+.block-card.tiny .bc-x{top:50%;transform:translateY(-50%)}
 .block-card .block-resize{position:absolute;left:0;right:0;bottom:0;height:10px;cursor:ns-resize;touch-action:none;z-index:3}
 .block-card .block-resize::after{content:'';position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:24px;height:3px;border-radius:3px;background:var(--accent);opacity:.45}
 .block-card.p1{border-left-color:var(--p1)} .block-card.p2{border-left-color:var(--p2)}
