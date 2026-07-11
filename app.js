@@ -48,7 +48,7 @@
       tasks: [],       // 빈 상태로 시작 — 온보딩은 '사용 가이드'(첫 실행 자동)와 빈 화면 안내가 담당
       projects: [],
       sessions: [],
-      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5, focusOrder:null },
+      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5, focusOrder:null, keepMonths:6 },
       top3: {},
       events: [],
       holidays: [],
@@ -747,7 +747,7 @@
     if(t.due!==todayStr()){
       const b=el(`<button class="iconbtn gc-today" title="오늘 할 일로" aria-label="오늘 할 일로">${cic('today')}</button>`);
       b.onclick=e=>{ e.stopPropagation();
-        t.due=todayStr(); if(t.status!=='next') t.status='next'; t.updatedAt=Date.now();
+        t.due=todayStr(); t.completedAt=null; if(t.status!=='next') t.status='next'; t.updatedAt=Date.now();
         save(); renderGtdBoard(); renderSidebarCounts(); toast('오늘 할 일에 추가했어요');
       };
       card.querySelector('.gc-title').appendChild(b);
@@ -1921,7 +1921,7 @@
   }
 
   // ---------- PWA 설치 ----------
-  // isStandalone·installInstructions → logic.js
+  // isStandalone·installInstructions → helpers.js(플랫폼 감지)
 
   // ---------- 스마트 추천 (지금 이 틈) ----------
   // 설계 원칙: AI는 추천만, 결정은 사람. 자동 배치/삭제 금지.
@@ -2002,7 +2002,7 @@
       if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}</span>`));
       if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip">${esc(p.name)}</span>`)); }
       card.querySelector('[data-a="focus"]').onclick=()=>startPomoForTask(t.id);
-      card.querySelector('[data-a="today"]').onclick=()=>{ t.due=todayStr(); if(t.status==='inbox'||t.status==='waiting')t.status='next'; t.updatedAt=Date.now(); save(); renderSuggest(); };
+      card.querySelector('[data-a="today"]').onclick=()=>{ t.due=todayStr(); t.completedAt=null; if(t.status!=='next') t.status='next'; t.updatedAt=Date.now(); save(); renderSuggest(); }; // '오늘로 보내기' 통일 규칙(due=오늘+next 승격)
       card.querySelector('[data-a="done"]').onclick=()=>{ toggleDone(t.id); renderSuggest(); };
       card.querySelector('.sg-title').onclick=()=>openTask(t.id);
       list.appendChild(card);

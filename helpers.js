@@ -40,3 +40,14 @@ function monthlyOccDate(ev,y,m){
   if(dom>new Date(y,m+1,0).getDate()) return null;
   return new Date(y,m,dom);
 }
+
+// PWA 설치 상태/안내 — 플랫폼 감지(브라우저 API read-only). 도메인 로직은 logic.js에.
+function isStandalone(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true; }
+function installInstructions(){
+  const ua=navigator.userAgent;
+  if(/iphone|ipad|ipod/i.test(ua)) return 'Safari 하단 공유 버튼(􀈂)을 누르고 "홈 화면에 추가"를 선택하세요.';
+  if(/macintosh|mac os x/i.test(ua) && /safari/i.test(ua) && !/chrome|crios|edg|chromium/i.test(ua))
+    return 'Safari 메뉴 → 파일 → "Dock에 추가…", 또는 주소창 옆 공유 버튼 → "Dock에 추가"를 선택하세요.';
+  if(/android/i.test(ua)) return 'Chrome 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 선택하세요.';
+  return '브라우저 주소창 오른쪽의 설치 아이콘(⊕/모니터 모양)을 누르거나, 메뉴에서 "앱 설치"를 선택하세요.';
+}
