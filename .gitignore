@@ -3,12 +3,9 @@
 
 # 압축 원본 / 참고 자료 (저장소에는 추적하지 않음)
 *.zip
-TEUM_Claude_Project/
-TEUM_Product_Documentation/
 
 # 의존성 (테스트용 jsdom 등)
 node_modules/
-node_modules
 package-lock.json
 
 # 에디터 / 임시

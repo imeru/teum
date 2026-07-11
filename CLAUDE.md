@@ -52,10 +52,9 @@
 - `constants.js` `PROJECT_COLORS, DOW, KR_HOLIDAYS(연도별)·KR_HOLIDAYS_FIXED·KR_HOLIDAY_NAMES, CAL_END/SNAP_MIN/PX_PER_MIN, MEMO_COLORS`.
 - `supabase.js` supabase-js UMD 번들(CDN 대신 로컬). `vendor/` Quill 에디터 번들.
 - `service-worker.js` 오프라인 캐시(cache-first, 같은 출처만). `manifest.json`, `icons/` PWA.
-- `privacy.html` 개인정보처리방침. `_headers` 보안 헤더(Netlify형식, GitHub Pages에서는 무시됨).
+- `privacy.html` 개인정보처리방침.
 - `tests/run.mjs` 헤드리스 테스트(jsdom). `.github/workflows/ci.yml` push마다 문법 검사+전체 테스트.
 - `docs/` 제품 설계 문서 세트(최상단 참조). `README.md` 배포·Supabase·Google 로그인 설정(RLS SQL 포함).
-- `HANDOFF.md` 초기 인수인계 문서(낡음). 충돌 시 이 파일(CLAUDE.md)이 우선한다.
 
 ## 실행 / 테스트
 - 실행: `index.html`을 브라우저로 열면 됨(로컬 저장). PWA·로그인·동기화는 HTTPS 호스팅 필요.
