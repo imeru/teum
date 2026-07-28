@@ -96,7 +96,7 @@
 
 ## 클라우드 동기화 (수정 시 신중, 테스트 필수)
 - 로그인 필수(Google OAuth). 단 **오프라인 그레이스**: 이 기기에서 로그인했던 사용자는 오프라인/서버 접속 불가 시 통과(`flowdo.lastAuth`, 배지 '오프라인', 복귀 시 자동 세션 복구).
-- 병합은 `mergeStates`(logic.js): tasks/memos/folders/projects/events는 **id별 updatedAt 최신 우선 + tombstone**, sessions/holidays는 합집합, settings/top3/weekNotes는 키별 병합(충돌 시 상태 updatedAt 최신 쪽). 같은 항목 충돌은 필드 병합이 아니라 최신 객체 전체 승리다.
+- 병합은 `mergeStates`(logic.js): tasks/memos/folders/projects/events는 **id별 updatedAt 최신 우선 + tombstone**, sessions/holidays는 합집합, settings/top3/weekNotes는 키별 병합(충돌 시 상태 updatedAt 최신 쪽). 같은 항목 충돌은 필드 병합이 아니라 최신 객체 전체 승리다. **예외**: `settings.focusOrder`(집중 프로파일)는 유효 순열이 `null`·무효값에 덮이지 않는다(미설정 기기가 설정 기기를 초기화하는 것 방지 — durability 가드).
 - pull은 내용 시그니처(sigOf)로 게이트, 로컬 기여가 있으면 병합본을 다시 push(수렴). 트리거: 실시간 구독(내 행 변경), 포커스/가시성/온라인 복귀, 45초 폴링. 편집·모달 중(`syncBusy`)에는 보류.
 - 서버: 테이블 `flowdo`(id text PK, data jsonb, updated_at timestamptz). RLS "own rows" 정책 적용됨(본 행 `u_<uid>` + 접미사 행 허용, README SQL). 보관함 `u_<uid>:arc`, 주간 스냅샷 `u_<uid>:snap:날짜`(최근 4개, 설정에서 복원).
 - 데이터 다이어트: `archiveSweep`이 부팅 시 완료 후 keepMonths 지난 할 일·세션, 종료 후 5년 지난 확정 종료 일정을 보관함으로 이동(+tombstone).

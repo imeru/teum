@@ -1034,8 +1034,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   section('프로필 동기화 병합');
   ck('한쪽만 focusOrder → 보존', JSON.stringify(mergeStates({settings:{focusOrder:ORDER},updatedAt:20},{settings:{},updatedAt:10}).settings.focusOrder)===JSON.stringify(ORDER));
-  ck('null이 newer면 클로버', mergeStates({settings:{focusOrder:ORDER},updatedAt:10},{settings:{focusOrder:null},updatedAt:20}).settings.focusOrder===null);
-  ck('충돌 → newer 승', JSON.stringify(mergeStates({settings:{focusOrder:['night','eve','noon','lunch','dawn','morn']},updatedAt:10},{settings:{focusOrder:ORDER},updatedAt:20}).settings.focusOrder)===JSON.stringify(ORDER));
+  // [durability] 미설정(null)이 더 최신이어도 유효 프로파일을 덮지 않는다 — 기기별 초기화 버그 방지
+  ck('null(newer)이 유효 프로파일 못 덮음', JSON.stringify(mergeStates({settings:{focusOrder:ORDER},updatedAt:10},{settings:{focusOrder:null},updatedAt:20}).settings.focusOrder)===JSON.stringify(ORDER));
+  ck('무효(newer)도 유효 프로파일 못 덮음', JSON.stringify(mergeStates({settings:{focusOrder:ORDER},updatedAt:10},{settings:{focusOrder:['x','x']},updatedAt:20}).settings.focusOrder)===JSON.stringify(ORDER));
+  ck('설정 기기가 더 오래돼도 프로파일 유지(양방향)', JSON.stringify(mergeStates({settings:{focusOrder:null},updatedAt:30},{settings:{focusOrder:ORDER},updatedAt:5}).settings.focusOrder)===JSON.stringify(ORDER));
+  ck('둘 다 null → null(추천 불변)', mergeStates({settings:{focusOrder:null},updatedAt:10},{settings:{focusOrder:null},updatedAt:20}).settings.focusOrder===null);
+  ck('둘 다 유효면 newer 승(정상 충돌)', JSON.stringify(mergeStates({settings:{focusOrder:['night','eve','noon','lunch','dawn','morn']},updatedAt:10},{settings:{focusOrder:ORDER},updatedAt:20}).settings.focusOrder)===JSON.stringify(ORDER));
 
   section('집중 순서 UI');
   // baseState는 focusOrder 없음 → migrate가 null로 정규화(미설정) 검증

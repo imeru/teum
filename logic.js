@@ -231,11 +231,18 @@ function mergeStates(local, remote){
   // settings/top3/weekNotes는 키별 얕은 병합(양쪽 변경 보존, 충돌 시 newer 우선),
   // holidays는 합집합 — 기존엔 'newer 통째로'라 한쪽 변경이 유실되던 비대칭 버그 수정.
   const mergeMap=(key)=>Object.assign({}, older[key]||{}, newer[key]||{});
+  const settings=mergeMap('settings');
+  // [프로파일 durability] 유효한 집중 순서(focusOrder)는 null/무효에 덮이지 않는다.
+  // 미설정 기기(focusOrder=null)가 더 최신이라는 이유로 설정 기기의 프로파일을 초기화하던 문제 방지.
+  // 양쪽 다 유효하면 위 mergeMap의 newer 우선(정상 충돌 해소) 유지. 둘 다 null이면 null(추천 불변).
+  const lfo=(L.settings||{}).focusOrder, rfo=(R.settings||{}).focusOrder;
+  if(isValidFocusOrder(lfo)&&!isValidFocusOrder(rfo)) settings.focusOrder=lfo;
+  else if(isValidFocusOrder(rfo)&&!isValidFocusOrder(lfo)) settings.focusOrder=rfo;
   return {
     tasks, sessions, memos, folders,
     projects: byId('projects'),
     events: byId('events'),
-    settings: mergeMap('settings'),
+    settings,
     top3: mergeMap('top3'),
     weekNotes: mergeMap('weekNotes'),
     holidays: [...new Set([...(L.holidays||[]), ...(R.holidays||[])])],
