@@ -618,6 +618,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   $('#memoBody .memo-chk').classList.add('checked');
   $('#memoBody .memo-chk-t').click();
   ck('텍스트 클릭은 토글 안 함', $('#memoBody .memo-chk').classList.contains('checked'));
+  // 체크리스트 Enter: 다음 줄 생성 + 커서 앵커(iOS 튕김 방지), 저장물엔 앵커 없음
+  const ZW = '​';
+  const putCaretEnd = span => { const tn = span.lastChild || span; const r = window.document.createRange(); r.setStart(tn, tn.nodeType === 3 ? tn.nodeValue.length : 0); r.collapse(true); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); };
+  const enter = () => $('#memoBody').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  $('#memoBody').innerHTML = '<div class="memo-chk"><span class="memo-chk-box" contenteditable="false"></span><span class="memo-chk-t">첫항목</span></div>';
+  $('#memoBody').dispatchEvent(new window.Event('input'));
+  putCaretEnd($('#memoBody .memo-chk-t'));
+  enter();
+  ck('Enter → 체크 줄 2개', $$('#memoBody .memo-chk').length === 2);
+  const newT = $$('#memoBody .memo-chk-t')[1];
+  ck('새 줄 텍스트 스팬에 커서 앵커(텍스트 노드)', !!newT && newT.firstChild && newT.firstChild.nodeType === 3);
+  ck('저장 HTML에 앵커 문자 없음', !(JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id).html || '').includes(ZW));
+  // 빈(앵커만) 체크 줄에서 Enter → 체크리스트 빠져나감
+  putCaretEnd(newT);
+  enter();
+  ck('빈 줄 Enter → 체크 줄 1개로(빠져나감)', $$('#memoBody .memo-chk').length === 1);
+  ck('Enter 처리 무에러', !getErr());
   // 일시 직접 수정
   const cIn = $('#memoCreated'); cIn.value = '2020-01-02T03:04'; cIn.dispatchEvent(new window.Event('change'));
   const edited = JSON.parse(localStorage.getItem('flowdo.state.v1')).memos.find(m => m.id === saved.id);

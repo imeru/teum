@@ -423,10 +423,19 @@
     d.querySelectorAll('input[type="checkbox"]').forEach(c=>c.replaceWith(document.createTextNode(c.checked?'[x] ':'[ ] ')));
     d.querySelectorAll('br').forEach(b=>b.replaceWith(document.createTextNode('\n')));
     d.querySelectorAll('p,div,li').forEach(b=>b.appendChild(document.createTextNode('\n')));
-    return (d.textContent||'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+    return (d.textContent||'').replace(/​/g,'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
   }
   // ----- OneNote식 체크박스 (박스만 클릭 토글, 텍스트는 편집 가능) -----
   function memoSetCaret(node,offset){ try{ const r=document.createRange(),s=document.getSelection(); r.setStart(node,offset); r.collapse(true); s.removeAllRanges(); s.addRange(r); }catch(e){} }
+  const MEMO_ZWSP='​'; // 커서 앵커 — 빈 인라인 스팬엔 iOS가 커서를 못 잡아 직전 줄로 튕긴다. 실제 텍스트 노드를 둬야 함.
+  // 체크 줄 텍스트 스팬 '끝'에 커서를 확실히 놓는다. 비어 있으면 ZWSP 앵커를 넣고 그 뒤에 놓는다.
+  function memoCaretEnd(span){
+    let tn=span.lastChild;
+    if(!tn||tn.nodeType!==3){ tn=document.createTextNode(MEMO_ZWSP); span.appendChild(tn); }
+    memoSetCaret(tn, tn.nodeValue.length);
+  }
+  // 앵커 문자는 저장·검색·판정에서 무시(보이지 않게).
+  function memoStripZwsp(s){ return (s||'').replace(/​/g,''); }
   function memoBox(checked){ const b=document.createElement('span'); b.className='memo-chk-box'; b.setAttribute('contenteditable','false'); b.setAttribute('role','checkbox'); b.setAttribute('aria-checked',checked?'true':'false'); return b; }
   function memoMakeCheckLine(div){
     if(div.classList.contains('memo-chk')) return div;
@@ -466,7 +475,7 @@
     if(block.classList && block.classList.contains('memo-chk')){
       memoUncheckLine(block); memoSetCaret(block, block.childNodes.length);
     } else {
-      memoMakeCheckLine(block); const t=block.querySelector('.memo-chk-t'); if(t) memoSetCaret(t, t.childNodes.length);
+      memoMakeCheckLine(block); const t=block.querySelector('.memo-chk-t'); if(t) memoCaretEnd(t);
     }
   }
   // 저장된 옛 구조(label>input)·br 줄을 새 구조/블록으로 정규화 (에디터 로드 시 1회)
@@ -593,7 +602,7 @@
     host.appendChild(fileInput);
     bo.innerHTML = (m.html!=null ? m.html : memoTextToHtml(m.body));
     memoMigrateChecks(bo); memoNormalize(bo);
-    const syncBody=()=>{ m.html=bo.innerHTML; m.body=memoHtmlToText(bo.innerHTML); m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); };
+    const syncBody=()=>{ const raw=memoStripZwsp(bo.innerHTML); m.html=raw; m.body=memoHtmlToText(raw); m.updatedAt=Date.now(); save(); refreshDates(); markSaved(); }; // 저장물엔 커서 앵커 제외(라이브 DOM엔 유지)
     bo.addEventListener('input', syncBody);
     // 체크박스: 박스(.memo-chk-box)만 클릭 토글 → 텍스트 편집 보존
     bo.addEventListener('click', e=>{
@@ -608,14 +617,16 @@
       const line=node&&node.closest?node.closest('.memo-chk'):null; if(!line||!bo.contains(line)) return;
       e.preventDefault();
       const t=line.querySelector('.memo-chk-t');
-      if(!t||!(t.textContent||'').trim()){
+      if(!t||!memoStripZwsp(t.textContent).trim()){
+        // 빈 체크 줄에서 Enter → 체크리스트 빠져나와 일반 줄
         const nd=document.createElement('div'); nd.appendChild(document.createElement('br'));
         line.replaceWith(nd); memoSetCaret(nd,0);
       } else {
+        // 다음 체크 줄 생성 + 커서를 새 줄 텍스트 스팬에 확실히(앵커) — iOS에서 직전 줄로 튕김 방지
         const nd=document.createElement('div'); nd.className='memo-chk';
         const nt=document.createElement('span'); nt.className='memo-chk-t';
         nd.appendChild(memoBox(false)); nd.appendChild(nt);
-        line.after(nd); memoSetCaret(nt,0);
+        line.after(nd); memoCaretEnd(nt);
       }
       syncBody();
     });
