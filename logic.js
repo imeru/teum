@@ -153,19 +153,24 @@ function suggestScore(t,gap,opts={}){
   return {score,reason};
 }
 
-// 자동 규칙 매칭(순수): 제목에 키워드가 부분 문자열로 들어 있으면 그 규칙의 기본값을 얻는다.
-// 여러 규칙이 걸리면 키워드가 긴(더 구체적인) 규칙이 필드별로 이긴다. 값이 정해진 필드만 반환(없으면 {}).
+// 자동 규칙 매칭(순수): 제목에 규칙의 키워드가 부분 문자열로 들어 있으면 그 규칙의 기본값을 얻는다.
+// kw는 쉼표로 여러 개 지정 가능(예: '논문 리뷰, Paper review, PaperReview'). 대소문자 무시(영문 자동).
+// 여러 규칙이 걸리면 '매칭된 키워드가 긴(더 구체적인)' 규칙이 필드별로 이긴다. 값이 정해진 필드만 반환(없으면 {}).
 // ML 아님 — 사용자가 직접 쓴 결정론적 규칙. DOM·Date·랜덤에 의존하지 않는다.
 function matchAutoRule(title, rules){
   if(!Array.isArray(rules)) return {};
   const t=String(title||'').toLowerCase();
-  const matched=rules.filter(r=>{
-    if(!r) return false;
-    const kw=String(r.kw||'').trim();
-    return kw.length>0 && t.includes(kw.toLowerCase());
-  }).sort((a,b)=> String(b.kw||'').trim().length - String(a.kw||'').trim().length); // 긴 키워드 우선
+  const scored=[];
+  for(const r of rules){
+    if(!r) continue;
+    const kws=String(r.kw||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+    let best=0;
+    for(const k of kws){ if(t.includes(k) && k.length>best) best=k.length; }
+    if(best>0) scored.push({r, w:best});
+  }
+  scored.sort((a,b)=> b.w - a.w); // 매칭된 키워드가 더 긴(구체적) 규칙 우선
   const out={};
-  for(const r of matched){
+  for(const {r} of scored){
     if(out.estimate===undefined && Number.isFinite(r.estimate) && r.estimate>0) out.estimate=r.estimate;
     if(out.priority===undefined && Number.isInteger(r.priority) && r.priority>=1 && r.priority<=4) out.priority=r.priority;
     if(out.weight===undefined && (r.weight==='light'||r.weight==='focus')) out.weight=r.weight;
@@ -258,6 +263,11 @@ function mergeStates(local, remote){
   const lfo=(L.settings||{}).focusOrder, rfo=(R.settings||{}).focusOrder;
   if(isValidFocusOrder(lfo)&&!isValidFocusOrder(rfo)) settings.focusOrder=lfo;
   else if(isValidFocusOrder(rfo)&&!isValidFocusOrder(lfo)) settings.focusOrder=rfo;
+  // [규칙 durability] 비어있음/없음이 규칙 목록을 덮지 않게 — 규칙 미사용 기기가 설정 기기를 초기화하는 것 방지.
+  const lar=(L.settings||{}).autoRules, rar=(R.settings||{}).autoRules;
+  const okL=Array.isArray(lar)&&lar.length>0, okR=Array.isArray(rar)&&rar.length>0;
+  if(okL&&!okR) settings.autoRules=lar;
+  else if(okR&&!okL) settings.autoRules=rar;
   return {
     tasks, sessions, memos, folders,
     projects: byId('projects'),

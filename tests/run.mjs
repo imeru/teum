@@ -1542,11 +1542,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const st = () => JSON.parse(w.localStorage.getItem('flowdo.state.v1')).settings.autoRules;
   ck('규칙 추가 → 1개', st().length === 1);
   ck('빈 규칙 안내 사라짐', $('#rules-list .rule-row'));
-  // 키워드 입력
-  const kw = $('.rule-row .r-kw'); kw.value = '회의록'; kw.dispatchEvent(new w.Event('change', { bubbles: true }));
+  // 키워드 입력 (매 타자 저장 — input 이벤트)
+  const kw = $('.rule-row .r-kw'); kw.value = '회의록'; kw.dispatchEvent(new w.Event('input', { bubbles: true }));
   ck('키워드 저장', st()[0].kw === '회의록');
   // 소요 입력
-  const est = $('.rule-row .r-est'); est.value = '25'; est.dispatchEvent(new w.Event('change', { bubbles: true }));
+  const est = $('.rule-row .r-est'); est.value = '25'; est.dispatchEvent(new w.Event('input', { bubbles: true }));
   ck('소요 저장', st()[0].estimate === 25);
   // 우선순위 입력
   const pri = $('.rule-row .r-pri'); pri.value = '2'; pri.dispatchEvent(new w.Event('change', { bubbles: true }));
@@ -1555,15 +1555,46 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const wt = $('.rule-row .r-wt'); wt.value = 'focus'; wt.dispatchEvent(new w.Event('change', { bubbles: true }));
   ck('에너지 저장', st()[0].weight === 'focus');
   // 빈 문자열/없음 → null
-  est.value = ''; est.dispatchEvent(new w.Event('change', { bubbles: true }));
+  est.value = ''; est.dispatchEvent(new w.Event('input', { bubbles: true }));
   ck('빈 소요 → null', st()[0].estimate === null);
   pri.value = ''; pri.dispatchEvent(new w.Event('change', { bubbles: true }));
   ck('없음 우선순위 → null', st()[0].priority === null);
-  // 삭제
-  $('.rule-row .r-del').click();
+  // [회귀] 편집 중이던 값이 '규칙 추가'로 목록 재렌더돼도 유지 (input 저장 덕분)
+  const kw2 = $('.rule-row .r-kw'); kw2.value = '주간보고'; kw2.dispatchEvent(new w.Event('input', { bubbles: true }));
+  const est2 = $('.rule-row .r-est'); est2.value = '40'; est2.dispatchEvent(new w.Event('input', { bubbles: true }));
+  $('#rule-add').click(); // 목록 다시 그림
+  ck('추가해도 기존 키워드 유지', st()[0].kw === '주간보고');
+  ck('추가해도 기존 소요 유지', st()[0].estimate === 40);
+  ck('추가해도 DOM에 값 유지', $$('.rule-row .r-kw')[0].value === '주간보고');
+  ck('규칙 2개', st().length === 2);
+  // 삭제(둘 다)
+  $$('.rule-row .r-del')[1].click(); $('.rule-row .r-del').click();
   ck('규칙 삭제 반영', st().length === 0);
   ck('삭제 후 안내 문구', $('#rules-list').textContent.includes('등록된 규칙이 없습니다'));
   ck('런타임 에러 없음(끝)', !getErr());
+}
+
+// ───────────────────────── 38) 자동 규칙 다중 키워드 + durability ─────────────────────────
+{
+  section('자동규칙 다중키워드');
+  const { window } = boot(baseState());
+  const m = window.matchAutoRule, MS = window.mergeStates;
+  const rule = [{ id:'r', kw:'논문 리뷰, Paper review, PaperReview', estimate:60, priority:2, weight:'focus' }];
+  ck('한글 키워드 매칭', m('논문 리뷰 준비', rule).estimate === 60);
+  ck('영문(공백 포함) 매칭', m('do Paper Review today', rule).priority === 2);
+  ck('영문(붙여쓰기) 매칭', m('PAPERREVIEW 마감', rule).weight === 'focus');
+  ck('여러 키워드 중 하나만 걸려도 됨', m('오늘 paper review', rule).estimate === 60);
+  ck('아무 키워드도 없으면 미매칭', Object.keys(m('회의 준비', rule)).length === 0);
+  // 매칭된 키워드가 더 긴 규칙 우선(다중 키워드 기준)
+  const two = [{ id:'a', kw:'리뷰', estimate:15 }, { id:'b', kw:'x, 논문 리뷰', estimate:60 }];
+  ck('매칭 키워드 길이로 우선', m('논문 리뷰 준비', two).estimate === 60);
+  // durability: 규칙 없는(빈) 기기가 더 최신이어도 규칙 목록을 덮지 않음
+  const withRules = { settings: { autoRules: rule }, updatedAt: 10 };
+  const empty = { settings: { autoRules: [] }, updatedAt: 20 };
+  ck('빈 규칙(newer)이 규칙 못 덮음', MS(withRules, empty).settings.autoRules.length === 1);
+  ck('규칙 없는 기기가 오래돼도 유지', MS(empty, withRules).settings.autoRules.length === 1);
+  const other = { settings: { autoRules: [{ id:'z', kw:'다른', estimate:5 }] }, updatedAt: 20 };
+  ck('양쪽 규칙 있으면 newer 승', MS(withRules, other).settings.autoRules[0].kw === '다른');
 }
 
 // ───────────────────────── 결과 ─────────────────────────
