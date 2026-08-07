@@ -1572,6 +1572,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('규칙 삭제 반영', st().length === 0);
   ck('삭제 후 안내 문구', $('#rules-list').textContent.includes('등록된 규칙이 없습니다'));
   ck('런타임 에러 없음(끝)', !getErr());
+  // [회귀] 입력 포커스 중엔 동기화 보류(render로 입력칸 파괴 방지) — 키워드 저장 유실의 근본 원인
+  $('#rule-add').click();
+  const kwIn = $('.rule-row .r-kw');
+  ck('포커스 없을 때 sync 가능', w.syncBusy() === false);
+  kwIn.focus();
+  ck('입력칸 포커스 중 syncBusy=true', w.syncBusy() === true);
+  kwIn.blur();
+  ck('포커스 해제 시 sync 재개', w.syncBusy() === false);
 }
 
 // ───────────────────────── 38) 자동 규칙 다중 키워드 + durability ─────────────────────────

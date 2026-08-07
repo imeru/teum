@@ -2848,7 +2848,14 @@
   if(cloud.url&&cloud.key) initSupa();
   // 다른 기기의 변경을 가져오기 위한 재동기화(pull). 앱이 떠 있어도 최신화.
   // 편집/모달 중에는 보류 — 병합 render가 작업 중 입력을 끊지 않도록.
-  function syncBusy(){ return !!editingMemoId || !!document.querySelector('#taskOverlay.show, #eventOverlay.show, #projOverlay.show'); }
+  function syncBusy(){
+    if(editingMemoId || document.querySelector('#taskOverlay.show, #eventOverlay.show, #projOverlay.show')) return true;
+    // 입력 중엔 동기화 render로 DOM을 갈아엎지 않는다 — 특히 설정의 규칙 키워드(한글 IME 조합) 입력이 날아가는 것 방지.
+    const ae=document.activeElement;
+    if(ae && (ae.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName||''))) return true;
+    return false;
+  }
+  if(typeof window!=='undefined') window.syncBusy=syncBusy; // 테스트에서 편집 중 동기화 보류 가드 검증용
   function maybePull(){ if(supa && authUser && syncKey() && !syncBusy()) cloudPull(false); }
   // 실시간 동기화: 내 행(flowdo:id) 변경을 구독 → 즉시 maybePull(검증된 병합 경로 재사용). 폴링은 백업으로 유지.
   function subscribeRealtime(){
