@@ -71,7 +71,7 @@
 - `projects[]`: `{id,name,color,updatedAt}` (색상 팔레트+사용자 지정, 생성 후 편집 가능)
 - `events[]`: 일정. 정기(`freq: weekly|monthly`, `monthMode: date|weekday`, `endMode: never|date|count`, `excludeHolidays`)와 일반(`freq:'once'`, `allDay`, `startDate~endDate` 멀티데이 배너) 모두 포함.
 - `sessions[]`: 뽀모도로 기록 `{id,taskId,date,duration,at}`. `memos[]`/`folders[]`: 메모(Quill html)·폴더, 휴지통은 `trashedAt`.
-- `settings`: `{focus,short,long,longEvery}`(뽀모도로 분) + `notify,notifyLead`(포그라운드 알림) + `focusOrder`(집중 프로파일: 6블록 키 순열|null. 미설정/무효면 timeOfDayMode 폴백 → 추천 불변) + `keepMonths`(완료 보관 기준 개월, 0=끄기, 기본 6)
+- `settings`: `{focus,short,long,longEvery}`(뽀모도로 분) + `notify,notifyLead`(포그라운드 알림) + `focusOrder`(집중 프로파일: 6블록 키 순열|null. 미설정/무효면 timeOfDayMode 폴백 → 추천 불변) + `keepMonths`(완료 보관 기준 개월, 0=끄기, 기본 6) + `autoRules[]`(자동 규칙: `{id,kw,estimate,priority,weight}`. 빠른 추가 시 제목에 kw 포함되면 빈 값만 채움. 매칭은 순수함수 `matchAutoRule`, 규칙 없으면 동작 불변)
 - `top3`: `{'YYYY-MM-DD':[taskId×3]}`. `weekNotes`: 주간 리뷰 메모. `holidays[]`: 사용자 추가 휴무일(국경일은 KR_HOLIDAY_NAMES로 자동).
 - `deletions`: `{id: deletedAt}` **tombstone. 삭제·보관의 동기화 전파에 필수라 임의로 비우면 안 된다**(12개월 지난 항목은 자동 정리).
 - `migrate()`가 부팅·가져오기·pull 모든 경로에서 누락 필드를 보강한다. 새 필드를 추가하면 migrate 한 줄도 함께 추가한다.

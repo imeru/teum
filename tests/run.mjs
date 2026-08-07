@@ -1438,6 +1438,134 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('런타임 에러 없음(오늘 드롭)', !getErr());
 }
 
+// ───────────────────────── 35) 자동 규칙 순수함수(matchAutoRule) ─────────────────────────
+{
+  section('자동규칙 순수');
+  const { window, getErr } = boot(baseState());
+  const m = window.matchAutoRule;
+  ck('런타임 에러 없음', !getErr());
+  // 단일 매칭 값 반환
+  const a = m('논문 리뷰 준비', [{ id:'r1', kw:'논문 리뷰', estimate:60, priority:2, weight:'focus' }]);
+  ck('단일 매칭 estimate', a.estimate === 60);
+  ck('단일 매칭 priority', a.priority === 2);
+  ck('단일 매칭 weight', a.weight === 'focus');
+  // 규칙 없음/매칭 없음 → {}
+  ck('규칙 배열 아님 → {}', Object.keys(m('제목', null)).length === 0);
+  ck('매칭 없음 → {}', Object.keys(m('그냥 할 일', [{ id:'r', kw:'회의', estimate:30 }])).length === 0);
+  // 빈 kw 무시
+  ck('빈 kw 무시', Object.keys(m('아무거나', [{ id:'r', kw:'   ', estimate:30 }])).length === 0);
+  // 긴 키워드 우선(같은 필드 충돌)
+  const b = m('논문 리뷰 준비', [
+    { id:'s', kw:'논문', estimate:15 },
+    { id:'l', kw:'논문 리뷰', estimate:60 },
+  ]);
+  ck('긴 키워드 우선', b.estimate === 60);
+  // 필드별 병합(A는 estimate만, B는 priority만)
+  const c = m('논문 리뷰 준비', [
+    { id:'A', kw:'논문 리뷰', estimate:45 },
+    { id:'B', kw:'준비', priority:1 },
+  ]);
+  ck('필드 병합 estimate', c.estimate === 45);
+  ck('필드 병합 priority', c.priority === 1);
+  // 무효값 무시
+  const d = m('테스트', [{ id:'x', kw:'테스트', priority:9, estimate:'x', weight:'foo' }]);
+  ck('무효 priority 무시', d.priority === undefined);
+  ck('무효 estimate 무시', d.estimate === undefined);
+  ck('무효 weight 무시', d.weight === undefined);
+  // 대소문자 무시(영문)
+  const e = m('Weekly REPORT', [{ id:'e', kw:'weekly report', priority:3 }]);
+  ck('대소문자 무시 매칭', e.priority === 3);
+}
+
+// ───────────────────────── 36) 자동 규칙 빠른추가 통합 ─────────────────────────
+{
+  section('자동규칙 빠른추가');
+  const rules = [{ id:'r1', kw:'논문 리뷰', estimate:60, priority:2, weight:'focus' }];
+  const findTask = (win, title) => JSON.parse(win.localStorage.getItem('flowdo.state.v1')).tasks.find(x => x.title === title);
+  const qa = (win, val) => {
+    const inp = win.document.querySelector('#quickInput'); inp.value = val;
+    inp.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  };
+  // 기본 적용
+  {
+    const { window: w, getErr } = boot(baseState({ settings: { focus:25, short:5, long:15, longEvery:4, autoRules: rules } }));
+    w.document.querySelector('.nav[data-view="today"]').click();
+    qa(w, '논문 리뷰 준비');
+    const t = findTask(w, '논문 리뷰 준비');
+    ck('규칙 estimate 적용', t && t.estimate === 60);
+    ck('규칙 priority 적용', t && t.priority === 2);
+    ck('규칙 weight 적용', t && t.weight === 'focus');
+    ck('런타임 에러 없음(기본)', !getErr());
+  }
+  // 비파괴: 사용자가 !1 지정 → priority 유지, 나머지 적용
+  {
+    const { window: w } = boot(baseState({ settings: { focus:25, short:5, long:15, longEvery:4, autoRules: rules } }));
+    w.document.querySelector('.nav[data-view="today"]').click();
+    qa(w, '논문 리뷰 !1');
+    const t = findTask(w, '논문 리뷰');
+    ck('사용자 priority 유지(!1)', t && t.priority === 1);
+    ck('비파괴에도 estimate 적용', t && t.estimate === 60);
+    ck('비파괴에도 weight 적용', t && t.weight === 'focus');
+  }
+  // 미매칭 → 기본값(priority 4, estimate null, weight null)
+  {
+    const { window: w } = boot(baseState({ settings: { focus:25, short:5, long:15, longEvery:4, autoRules: rules } }));
+    w.document.querySelector('.nav[data-view="today"]').click();
+    qa(w, '자료 정리');
+    const t = findTask(w, '자료 정리');
+    ck('미매칭 priority 4', t && t.priority === 4);
+    ck('미매칭 estimate null', t && t.estimate === null);
+    ck('미매칭 weight null', t && t.weight === null);
+  }
+  // autoRules 빈 배열 → 기존과 동일
+  {
+    const { window: w } = boot(baseState());
+    w.document.querySelector('.nav[data-view="today"]').click();
+    qa(w, '논문 리뷰 준비');
+    const t = findTask(w, '논문 리뷰 준비');
+    ck('규칙 없으면 priority 4', t && t.priority === 4);
+    ck('규칙 없으면 estimate null', t && t.estimate === null);
+    ck('규칙 없으면 weight null', t && t.weight === null);
+  }
+}
+
+// ───────────────────────── 37) 자동 규칙 설정 UI ─────────────────────────
+{
+  section('자동규칙 설정UI');
+  const { $, $$, window: w, getErr } = boot(baseState());
+  $('.nav[data-view="settings"]').click();
+  ck('런타임 에러 없음', !getErr());
+  const card = $$('.task strong').find(s => s.textContent.includes('자동 규칙'));
+  ck('자동 규칙 카드 존재', !!card);
+  // 규칙 추가
+  $('#rule-add').click();
+  const st = () => JSON.parse(w.localStorage.getItem('flowdo.state.v1')).settings.autoRules;
+  ck('규칙 추가 → 1개', st().length === 1);
+  ck('빈 규칙 안내 사라짐', $('#rules-list .rule-row'));
+  // 키워드 입력
+  const kw = $('.rule-row .r-kw'); kw.value = '회의록'; kw.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ck('키워드 저장', st()[0].kw === '회의록');
+  // 소요 입력
+  const est = $('.rule-row .r-est'); est.value = '25'; est.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ck('소요 저장', st()[0].estimate === 25);
+  // 우선순위 입력
+  const pri = $('.rule-row .r-pri'); pri.value = '2'; pri.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ck('우선순위 저장', st()[0].priority === 2);
+  // 에너지 입력
+  const wt = $('.rule-row .r-wt'); wt.value = 'focus'; wt.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ck('에너지 저장', st()[0].weight === 'focus');
+  // 빈 문자열/없음 → null
+  est.value = ''; est.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ck('빈 소요 → null', st()[0].estimate === null);
+  pri.value = ''; pri.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ck('없음 우선순위 → null', st()[0].priority === null);
+  // 삭제
+  $('.rule-row .r-del').click();
+  ck('규칙 삭제 반영', st().length === 0);
+  ck('삭제 후 안내 문구', $('#rules-list').textContent.includes('등록된 규칙이 없습니다'));
+  ck('런타임 에러 없음(끝)', !getErr());
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {

@@ -554,6 +554,10 @@ input,textarea,select{font-family:inherit}
 .focus-move{display:flex;gap:2px}
 .focus-move .iconbtn{font-size:12px;line-height:1;padding:4px 6px;color:var(--muted)}
 .focus-move .iconbtn:disabled{opacity:.3;cursor:default}
+.rules-list{display:flex;flex-direction:column;gap:8px}
+.rule-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rule-row input,.rule-row select{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;padding:7px 9px;font-size:13px;outline:none}
+.rule-row input:focus,.rule-row select:focus{border-color:var(--accent)}
 .proj-custom-color{display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted);cursor:pointer}
 .proj-custom-color input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer}
 .weight-pick{display:flex;gap:8px}

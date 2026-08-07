@@ -48,7 +48,7 @@
       tasks: [],       // 빈 상태로 시작 — 온보딩은 '사용 가이드'(첫 실행 자동)와 빈 화면 안내가 담당
       projects: [],
       sessions: [],
-      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5, focusOrder:null, keepMonths:6 },
+      settings: { focus:25, short:5, long:15, longEvery:4, notify:false, notifyLead:5, focusOrder:null, keepMonths:6, autoRules:[] },
       top3: {},
       events: [],
       holidays: [],
@@ -70,6 +70,7 @@
     if(s.settings.notifyLead===undefined) s.settings.notifyLead=5;
     if(s.settings.focusOrder===undefined) s.settings.focusOrder=null; // 개인 집중 프로파일(미설정=null → 기존 추천 불변)
     if(s.settings.keepMonths===undefined) s.settings.keepMonths=6; // 데이터 다이어트: 완료 후 N개월 지나면 보관(0=끄기)
+    if(!Array.isArray(s.settings.autoRules)) s.settings.autoRules=[]; // 자동 규칙(키워드→기본값). 미설정=빈 배열
     if(!s.top3) s.top3={};
     if(!s.events) s.events=[];
     if(!s.holidays) s.holidays=[];
@@ -808,8 +809,9 @@
 
   function quickAdd(raw, forceStatus){
     let title=raw, priority=4, tags=[], projectId='', due=null, status= forceStatus || (currentView==='inbox'?'inbox':'next');
+    let prioSet=false; // 사용자가 !n으로 우선순위를 직접 지정했는지 — 자동 규칙이 덮지 않도록 추적
     // priority !1..!4
-    title=title.replace(/!([1-4])/g,(m,p)=>{priority=+p;return '';});
+    title=title.replace(/!([1-4])/g,(m,p)=>{priority=+p;prioSet=true;return '';});
     // tags @x
     title=title.replace(/@(\S+)/g,(m,t)=>{tags.push('@'+t);return '';});
     // project #name (rest of token, allow spaces if matches existing)
@@ -828,7 +830,12 @@
     if(currentView==='today' && !due) due=todayStr();
     if(currentFilter&&currentFilter.type==='project') projectId=currentFilter.value;
     if(currentFilter&&currentFilter.type==='tag') tags.push(currentFilter.value);
-    state.tasks.push({id:uid(),title,notes:'',status,priority,tags:[...new Set(tags)],projectId,due,block:null,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null});
+    // 자동 규칙: 최종 제목에 등록 키워드가 있으면 빈 값만 비파괴적으로 채운다(직접 지정한 값은 유지).
+    const auto=matchAutoRule(title, state.settings.autoRules||[]);
+    if(!prioSet && auto.priority!=null) priority=auto.priority;
+    const estimate = auto.estimate!=null ? auto.estimate : null;
+    const weight = auto.weight!=null ? auto.weight : null;
+    state.tasks.push({id:uid(),title,notes:'',status,priority,tags:[...new Set(tags)],projectId,due,estimate,weight,block:null,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null});
     save(); render();
   }
 
@@ -2309,6 +2316,7 @@
     box.appendChild(settingsInstallCard());
     box.appendChild(settingsNotifyCard());
     box.appendChild(settingsFocusCard());
+    box.appendChild(settingsRulesCard());
     box.appendChild(settingsHolidayCard());
     box.appendChild(settingsDataCard());
     box.appendChild(settingsBackupCard());
@@ -2425,6 +2433,39 @@
       });
     };
     card.querySelector('#focus-reset').onclick=()=>{ state.settings.focusOrder=null; save(); renderRows(); };
+    renderRows();
+    return card;
+  }
+  // 자동 규칙: 키워드가 제목에 있으면 소요·우선순위·에너지를 빠른 추가 시 자동으로(빈 값만) 채운다.
+  function settingsRulesCard(){
+    const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:10px">
+      <strong>${svgIco('target')} 자동 규칙</strong>
+      <div class="note">제목에 키워드가 있으면 소요·우선순위·에너지를 자동으로 채웁니다(빠른 추가 시, 빈 값만). 직접 지정한 값은 덮지 않아요.</div>
+      <div class="rules-list" id="rules-list"></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn sm" id="rule-add">규칙 추가</button></div>
+    </div>`);
+    const listEl=card.querySelector('#rules-list');
+    const rules=()=> (state.settings.autoRules || (state.settings.autoRules=[]));
+    const renderRows=()=>{
+      const rs=rules(); listEl.innerHTML='';
+      if(!rs.length){ listEl.appendChild(el(`<div class="note">등록된 규칙이 없습니다. 자주 만드는 할 일의 키워드를 등록해 보세요.</div>`)); return; }
+      rs.forEach(r=>{
+        const row=el(`<div class="rule-row">
+          <input class="r-kw" type="text" placeholder="키워드" value="${esc(r.kw||'')}" style="flex:1;min-width:120px">
+          <input class="r-est" type="number" min="1" placeholder="분" value="${r.estimate!=null?r.estimate:''}" style="width:72px">
+          <select class="r-pri"><option value="">우선순위</option>${[1,2,3,4].map(p=>`<option value="${p}" ${r.priority===p?'selected':''}>P${p}</option>`).join('')}</select>
+          <select class="r-wt"><option value="">에너지</option><option value="light" ${r.weight==='light'?'selected':''}>가벼움</option><option value="focus" ${r.weight==='focus'?'selected':''}>집중</option></select>
+          <button class="iconbtn r-del" title="삭제" aria-label="규칙 삭제">${svgIco('trash')}</button>
+        </div>`);
+        row.querySelector('.r-kw').onchange=e=>{ r.kw=e.target.value.trim(); save(); };
+        row.querySelector('.r-est').onchange=e=>{ const v=+e.target.value; r.estimate=(Number.isFinite(v)&&v>0)?v:null; save(); };
+        row.querySelector('.r-pri').onchange=e=>{ const v=+e.target.value; r.priority=(v>=1&&v<=4)?v:null; save(); };
+        row.querySelector('.r-wt').onchange=e=>{ r.weight=(e.target.value==='light'||e.target.value==='focus')?e.target.value:null; save(); };
+        row.querySelector('.r-del').onclick=()=>{ const i=rules().indexOf(r); if(i>=0){ rules().splice(i,1); save(); renderRows(); } };
+        listEl.appendChild(row);
+      });
+    };
+    card.querySelector('#rule-add').onclick=()=>{ rules().push({id:uid(),kw:'',estimate:null,priority:null,weight:null}); save(); renderRows(); };
     renderRows();
     return card;
   }

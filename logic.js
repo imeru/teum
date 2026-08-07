@@ -153,6 +153,26 @@ function suggestScore(t,gap,opts={}){
   return {score,reason};
 }
 
+// 자동 규칙 매칭(순수): 제목에 키워드가 부분 문자열로 들어 있으면 그 규칙의 기본값을 얻는다.
+// 여러 규칙이 걸리면 키워드가 긴(더 구체적인) 규칙이 필드별로 이긴다. 값이 정해진 필드만 반환(없으면 {}).
+// ML 아님 — 사용자가 직접 쓴 결정론적 규칙. DOM·Date·랜덤에 의존하지 않는다.
+function matchAutoRule(title, rules){
+  if(!Array.isArray(rules)) return {};
+  const t=String(title||'').toLowerCase();
+  const matched=rules.filter(r=>{
+    if(!r) return false;
+    const kw=String(r.kw||'').trim();
+    return kw.length>0 && t.includes(kw.toLowerCase());
+  }).sort((a,b)=> String(b.kw||'').trim().length - String(a.kw||'').trim().length); // 긴 키워드 우선
+  const out={};
+  for(const r of matched){
+    if(out.estimate===undefined && Number.isFinite(r.estimate) && r.estimate>0) out.estimate=r.estimate;
+    if(out.priority===undefined && Number.isInteger(r.priority) && r.priority>=1 && r.priority<=4) out.priority=r.priority;
+    if(out.weight===undefined && (r.weight==='light'||r.weight==='focus')) out.weight=r.weight;
+  }
+  return out;
+}
+
 // 일정 설명 문자열
 const ORD_LABEL={1:'첫째',2:'둘째',3:'셋째',4:'넷째',5:'다섯째','-1':'마지막'};
 function describeEvent(ev){
