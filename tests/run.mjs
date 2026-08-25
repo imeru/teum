@@ -35,6 +35,7 @@ function boot(state, opts = {}) {
   if (opts.lastview) window.localStorage.setItem('flowdo.lastview', opts.lastview);
   if (!opts.firstRun) window.localStorage.setItem('flowdo.guideSeen', '1'); // 기본은 가이드 본 상태
   if (opts.lastAuth) window.localStorage.setItem('flowdo.lastAuth', JSON.stringify(opts.lastAuth)); // 오프라인 그레이스용 이전 로그인 기록
+  if (opts.supabase) window.supabase = opts.supabase; // Supabase 스텁 — 세션 확인 경로(만료·거부·무응답) 검증용
   let err = null;
   window.addEventListener('error', e => { err = e.error || e.message; });
   try { window.eval(JS); } catch (e) { err = e; }
@@ -1151,6 +1152,97 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     ck('기록 없음 → 게이트 유지', n.$('#authGate').classList.contains('show'));
     ck('기록 없음 → 배지 로컬', n.$('#syncBadge').textContent !== '오프라인');
     ck('런타임 에러 없음(게이트)', !n.getErr());
+  }
+}
+
+// ───────────────────────── 24-1) 세션 확인 실패도 그레이스 (온라인 표시인데 서버 도달 불가) ─────────────────────────
+{
+  section('세션 확인 실패 그레이스');
+  // Supabase 스텁: getSession 동작만 주입하고 나머지는 무해한 껍데기.
+  const stub = (getSession) => ({
+    createClient: () => ({
+      auth: {
+        getSession,
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+        signOut: () => Promise.resolve({}),
+        signInWithOAuth: () => Promise.resolve({}),
+      },
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }), like: () => Promise.resolve({ data: [] }) }),
+        upsert: () => Promise.resolve({ error: null }),
+        delete: () => ({ in: () => Promise.resolve({}) }),
+      }),
+      channel: () => ({ on() { return this; }, subscribe() { return this; } }),
+      removeChannel() {},
+    }),
+  });
+  const la = { id: 'u-77', email: 'me@example.com', at: 1 };
+
+  // 1) 토큰 만료 + 갱신 실패 → session:null. jsdom은 navigator.onLine=true라 예전 조건이면 막혔다.
+  {
+    const g = boot(baseState(), { lastAuth: la, supabase: stub(() => Promise.resolve({ data: { session: null }, error: { message: 'network' } })) });
+    await sleep(30);
+    ck('onLine=true 확인', g.window.navigator.onLine === true);
+    ck('세션 없음 → 게이트 통과', !g.$('#authGate').classList.contains('show'));
+    ck('배지 = 오프라인', g.$('#syncBadge').textContent === '오프라인');
+    ck('런타임 에러 없음(만료)', !g.getErr());
+  }
+  // 2) getSession 자체가 거부 → 통과
+  {
+    const g = boot(baseState(), { lastAuth: la, supabase: stub(() => Promise.reject(new Error('failed to fetch'))) });
+    await sleep(30);
+    ck('거부 → 게이트 통과', !g.$('#authGate').classList.contains('show'));
+    ck('런타임 에러 없음(거부)', !g.getErr());
+  }
+  // 3) 기록이 없으면 예전대로 게이트 유지 — 그레이스는 이 기기에서 로그인했던 계정에만 적용
+  {
+    const n = boot(baseState(), { supabase: stub(() => Promise.resolve({ data: { session: null }, error: null })) });
+    await sleep(30);
+    ck('기록 없음 → 게이트 유지', n.$('#authGate').classList.contains('show'));
+    ck('기록 없음 → 확인중 해제', !n.$('#authGate').classList.contains('checking'));
+  }
+  // 4) 유효 세션이면 그레이스가 아니라 정상 로그인
+  {
+    const g = boot(baseState(), { lastAuth: la, supabase: stub(() => Promise.resolve({ data: { session: { user: { id: 'u-77', email: 'me@example.com' } } }, error: null })) });
+    await sleep(30);
+    ck('유효 세션 → 게이트 통과', !g.$('#authGate').classList.contains('show'));
+    ck('유효 세션 → 배지 Google', g.$('#syncBadge').textContent === 'Google');
+  }
+  // 5) 응답이 영영 없어도(무한 대기) 타임아웃 후 통과 — 스피너에 갇히지 않는다
+  {
+    const g = boot(baseState(), { lastAuth: la, supabase: stub(() => new Promise(() => {})) });
+    await sleep(100);
+    ck('대기 중에는 확인중 유지', g.$('#authGate').classList.contains('checking'));
+    await sleep(3200);
+    ck('타임아웃 → 게이트 통과', !g.$('#authGate').classList.contains('show'));
+    ck('타임아웃 → 배지 오프라인', g.$('#syncBadge').textContent === '오프라인');
+  }
+  // 6) 연결이 돌아오면 그레이스에서 자동 복구 ('online' 이벤트)
+  {
+    let n = 0;
+    const g = boot(baseState(), { lastAuth: la, supabase: stub(() => {
+      n++;
+      return n === 1 ? Promise.resolve({ data: { session: null }, error: { message: 'x' } })
+                     : Promise.resolve({ data: { session: { user: { id: 'u-77', email: 'me@example.com' } } }, error: null });
+    }) });
+    await sleep(30);
+    ck('복구 전 배지 오프라인', g.$('#syncBadge').textContent === '오프라인');
+    g.window.dispatchEvent(new g.window.Event('online'));
+    await sleep(40);
+    ck('online 복귀 → 배지 Google', g.$('#syncBadge').textContent === 'Google');
+    ck('런타임 에러 없음(복구)', !g.getErr());
+  }
+  // 6) 그레이스 상태의 설정 화면: 다시 로그인·로그아웃 둘 다 제공
+  {
+    const g = boot(baseState(), { lastAuth: la, supabase: stub(() => Promise.resolve({ data: { session: null }, error: { message: 'x' } })) });
+    await sleep(30);
+    g.$('.nav[data-view="settings"]').click();
+    ck('다시 로그인 버튼', !!g.$('#cf-google'));
+    ck('로그아웃 버튼', !!g.$('#cf-logout'));
+    g.$('#cf-logout').click();
+    await sleep(20); // signOut()이 비동기라 게이트 갱신은 다음 틱
+    ck('로그아웃 → 게이트 복귀', g.$('#authGate').classList.contains('show'));
+    ck('로그아웃 → lastAuth 제거(스텁)', g.window.localStorage.getItem('flowdo.lastAuth') === null);
   }
 }
 

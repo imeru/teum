@@ -95,7 +95,7 @@
 - 완료·삭제는 `toast(msg, undoFn)`로 **실행 취소**를 제공한다(삭제는 tombstone 복원, 반복 완료는 생성 회차 회수 포함).
 
 ## 클라우드 동기화 (수정 시 신중, 테스트 필수)
-- 로그인 필수(Google OAuth). 단 **오프라인 그레이스**: 이 기기에서 로그인했던 사용자는 오프라인/서버 접속 불가 시 통과(`flowdo.lastAuth`, 배지 '오프라인', 복귀 시 자동 세션 복구).
+- 로그인 필수(Google OAuth). 단 **오프라인 그레이스**: 이 기기에서 로그인했던 사용자는 **세션 확인에 실패하는 모든 경우** 통과한다(오프라인, 인터넷 없는 와이파이, 토큰 갱신 실패, 서버 장애). `getSession()`은 `sessionOrNull()`이 3초 타임아웃과 거부 처리로 감싸므로 게이트가 스피너에 갇히지 않는다. 기록은 `flowdo.lastAuth`, 배지는 '오프라인'. 복구는 `recoverSession()`이 맡아 online 이벤트와 45초 폴링 양쪽에서 재시도한다(인터넷 없는 와이파이는 online 이벤트가 안 뜬다). 그레이스 중에는 자동 동기화(scheduleSync/maybePull/스냅샷)를 건너뛰고, 설정 계정 카드에 '다시 로그인'을 제공한다. `navigator.onLine`을 그레이스 조건으로 되돌리지 말 것(게이트는 보안 경계가 아니다).
 - 병합은 `mergeStates`(logic.js): tasks/memos/folders/projects/events는 **id별 updatedAt 최신 우선 + tombstone**, sessions/holidays는 합집합, settings/top3/weekNotes는 키별 병합(충돌 시 상태 updatedAt 최신 쪽). 같은 항목 충돌은 필드 병합이 아니라 최신 객체 전체 승리다. **예외**: `settings.focusOrder`(집중 프로파일)는 유효 순열이 `null`·무효값에 덮이지 않는다(미설정 기기가 설정 기기를 초기화하는 것 방지 — durability 가드).
 - pull은 내용 시그니처(sigOf)로 게이트, 로컬 기여가 있으면 병합본을 다시 push(수렴). 트리거: 실시간 구독(내 행 변경), 포커스/가시성/온라인 복귀, 45초 폴링. 편집·모달 중(`syncBusy`)에는 보류.
 - 서버: 테이블 `flowdo`(id text PK, data jsonb, updated_at timestamptz). RLS "own rows" 정책 적용됨(본 행 `u_<uid>` + 접미사 행 허용, README SQL). 보관함 `u_<uid>:arc`, 주간 스냅샷 `u_<uid>:snap:날짜`(최근 4개, 설정에서 복원).

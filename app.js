@@ -2323,7 +2323,9 @@
     content.appendChild(box);
   }
   function settingsAccountCard(){
-    const authBox = authUser
+    const authBox = (authUser && authUser._offline)
+      ? `<div class="note">${svgIco('alert')} 오프라인 모드로 사용 중입니다. 마지막 로그인: <b>${esc(authUser.email||'계정')}</b><br>연결되면 자동으로 동기화를 재개합니다. 계속 이 상태면 아래에서 다시 로그인하세요.</div><div class="row" style="align-items:center"><button class="btn primary" id="cf-google">다시 로그인</button><button class="btn" id="cf-logout">로그아웃</button></div>`
+      : authUser
       ? `<div class="row" style="align-items:center"><div class="note" style="flex:1">${svgIco('done')} Google 로그인됨: <b>${esc(authUser.email||'계정')}</b><br>이 계정으로 모든 기기가 자동 동기화됩니다.</div><button class="btn" id="cf-logout">로그아웃</button></div>`
       : `<button class="btn primary" id="cf-google">Google 계정으로 로그인</button><div class="note">로그인하면 어느 기기에서든 같은 데이터가 자동으로 동기화됩니다.</div>`;
     const card=el(`<div class="task" style="flex-direction:column;align-items:stretch;gap:14px">
@@ -2641,10 +2643,11 @@
       if(typeof supabase==='undefined'||!supabase.createClient) throw new Error('supabase 라이브러리 미로드');
       supa=supabase.createClient(cloud.url,cloud.key); // 로컬 번들(supabase.js) 전역 사용 — CDN 의존 제거, 오프라인 대응
       // 기존 세션 확인 + 상태 변화 구독 (Google 로그인)
-      supa.auth.getSession().then(({data})=>{
-        authUser=data&&data.session?data.session.user:null;
+      // 세션 확인은 토큰 갱신 때문에 네트워크를 탄다. 응답이 없거나 늦으면 기다리지 않고 그레이스로 넘긴다.
+      sessionOrNull().then(session=>{
+        authUser=session?session.user:null;
         if(authUser) rememberAuth(authUser);
-        else if(!navigator.onLine) offlineGrace(); // 오프라인이라 세션 확인 불가 → 이전 사용자로 로컬 사용
+        else offlineGrace(); // 세션 확인 실패·만료 → 이 기기에서 로그인했던 사용자면 로컬 사용 허용
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(!authUser||!authUser._offline){ if(syncKey()){ cloudPull(false); subscribeRealtime(); } }
@@ -2653,17 +2656,48 @@
       supa.auth.onAuthStateChange((_e,session)=>{
         authUser=session?session.user:null;
         if(authUser) rememberAuth(authUser);
-        else if(!navigator.onLine) offlineGrace(); // 오프라인 중 토큰 만료로 끊겨도 로그아웃시키지 않음
+        else offlineGrace(); // 토큰 만료·갱신 실패로 끊겨도 로그아웃시키지 않음(명시적 로그아웃은 lastAuth를 지워 제외)
         authChecked=true; updateAuthGate(); maybeRequireConsent();
         updateSyncBadge(); if(currentView==='settings') renderSettings();
         if(authUser&&!authUser._offline&&syncKey()){ cloudPull(false); subscribeRealtime(); } else if(!authUser) unsubscribeRealtime();
       });
       updateSyncBadge();
-      if(syncKey()) await cloudPull(false);
+      if(syncKey() && !(authUser&&authUser._offline)) await cloudPull(false);
     }catch(err){ console.warn('Supabase init 실패',err); supa=null; offlineGrace(); authChecked=true; updateAuthGate(); updateSyncBadge(); }
   }
+  // 세션 확인 래퍼 — getSession()은 액세스 토큰이 만료됐으면 갱신을 시도하므로 네트워크에 의존한다.
+  // 거부·지연·예외를 모두 '세션 없음'으로 접어 게이트가 무한 대기에 빠지지 않게 한다.
+  const SESSION_TIMEOUT=3000;
+  function sessionOrNull(){
+    if(!supa) return Promise.resolve(null);
+    return new Promise(resolve=>{
+      let done=false;
+      const fin=s=>{ if(!done){ done=true; resolve(s||null); } };
+      setTimeout(()=>fin(null), SESSION_TIMEOUT);
+      try{ supa.auth.getSession().then(r=>fin(r&&r.data?r.data.session:null), ()=>fin(null)); }
+      catch(_){ fin(null); }
+    });
+  }
+  // 그레이스 복구 — 'online' 이벤트가 없는 경우(와이파이는 붙어 있는데 인터넷만 없다가 살아남)도
+  // 주기 점검으로 회복시킨다. 이게 없으면 그레이스에 들어간 기기가 새로고침 전까지 동기화를 멈춘다.
+  let recovering=false;
+  async function recoverSession(){
+    if(recovering || !authUser || !authUser._offline) return;
+    recovering=true;
+    try{
+      if(!supa){ await initSupa(); return; }
+      const s=await sessionOrNull();
+      if(s&&s.user){
+        authUser=s.user; rememberAuth(authUser); updateSyncBadge();
+        if(currentView==='settings') renderSettings();
+        if(syncKey()){ cloudPull(false); subscribeRealtime(); }
+      }
+    }catch(err){ console.warn('세션 복구 실패',err); }
+    finally{ recovering=false; }
+  }
   // 오프라인 그레이스 — 이 기기에서 마지막으로 로그인한 계정을 기억(로그아웃 시 제거).
-  // 세션 확인이 불가능할 때(오프라인·서버 접속 실패)만 이전 사용자를 통과시켜 로컬 사용을 허용.
+  // 세션 확인에 실패하면(오프라인, 인터넷 없는 와이파이, 서버 장애, 토큰 갱신 불가) 이전 사용자를 통과시킨다.
+  // 게이트는 보안 경계가 아니다. 로컬 데이터는 이미 이 기기에 있고 서버 접근은 JWT가 따로 막는다.
   function rememberAuth(u){ try{ localStorage.setItem('flowdo.lastAuth', JSON.stringify({id:u.id,email:u.email||'',at:Date.now()})); }catch(_){} }
   function lastAuth(){ try{ return JSON.parse(localStorage.getItem('flowdo.lastAuth')||'null'); }catch(_){ return null; } }
   function offlineGrace(){
@@ -2709,7 +2743,7 @@
     else { b.textContent='로컬'; b.classList.remove('on'); }
   }
   function scheduleSync(){
-    if(!supa||!syncKey()) return;
+    if(!supa||!syncKey()||(authUser&&authUser._offline)) return; // 그레이스 중에는 유효 토큰이 없어 업로드가 어차피 거부된다
     clearTimeout(syncTimer);
     syncTimer=setTimeout(()=>cloudPush(false),1200);
   }
@@ -2856,7 +2890,7 @@
     return false;
   }
   if(typeof window!=='undefined') window.syncBusy=syncBusy; // 테스트에서 편집 중 동기화 보류 가드 검증용
-  function maybePull(){ if(supa && authUser && syncKey() && !syncBusy()) cloudPull(false); }
+  function maybePull(){ if(supa && authUser && !authUser._offline && syncKey() && !syncBusy()) cloudPull(false); }
   // 실시간 동기화: 내 행(flowdo:id) 변경을 구독 → 즉시 maybePull(검증된 병합 경로 재사용). 폴링은 백업으로 유지.
   function subscribeRealtime(){
     if(!supa) return;
@@ -2871,9 +2905,9 @@
   function unsubscribeRealtime(){ try{ if(rtChannel&&supa) supa.removeChannel(rtChannel); }catch(_){} rtChannel=null; }
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') maybePull(); });
   window.addEventListener('focus', maybePull);
-  window.addEventListener('online', ()=>{ if(authUser&&authUser._offline){ initSupa(); } else maybePull(); }); // 복귀 시 세션 복구 → 자동 동기화
-  setInterval(maybePull, 45000); // 주기적 폴링(가벼움: 내용 동일하면 네트워크만, render 생략)
+  window.addEventListener('online', ()=>{ if(authUser&&authUser._offline) recoverSession(); else maybePull(); }); // 복귀 시 세션 복구 → 자동 동기화
+  setInterval(()=>{ if(authUser&&authUser._offline){ if(navigator.onLine) recoverSession(); } else maybePull(); }, 45000); // 주기적 폴링(그레이스면 세션 복구 시도)
   // 세션 확인이 지연되면(느린 네트워크 등) 로그인 버튼이라도 보여줌
-  setTimeout(()=>{ if(!authChecked){ authChecked=true; updateAuthGate(); } }, 7000);
+  setTimeout(()=>{ if(!authChecked){ offlineGrace(); authChecked=true; updateAuthGate(); updateSyncBadge(); } }, 7000);
 
 })();
