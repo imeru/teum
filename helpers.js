@@ -43,6 +43,7 @@ function monthlyOccDate(ev,y,m){
 
 // PWA 설치 상태/안내 — 플랫폼 감지(브라우저 API read-only). 도메인 로직은 logic.js에.
 function isStandalone(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true; }
+function isIOS(){ const ua=navigator.userAgent||''; return /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints>1); } // iPadOS는 macintosh로 위장
 function installInstructions(){
   const ua=navigator.userAgent;
   if(/iphone|ipad|ipod/i.test(ua)) return 'Safari 하단 공유 버튼(􀈂)을 누르고 "홈 화면에 추가"를 선택하세요.';

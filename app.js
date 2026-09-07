@@ -39,7 +39,8 @@
   function syncKey(){ return authUser ? ('u_'+authUser.id) : (cloud.space||''); }
 
   // Pomodoro runtime (lives across view switches)
-  const pomo = { mode:'focus', remaining:25*60, running:false, taskId:'', cycle:0, interval:null };
+  // remaining은 표시용 캐시다. 진행 중 정답은 endAt(만료 시각)이라 창을 내려 setInterval이 늦춰져도 시간이 정확하다.
+  const pomo = { mode:'focus', remaining:25*60, running:false, taskId:'', cycle:0, interval:null, endAt:null, pipWin:null };
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -1458,9 +1459,11 @@
       </div>
       <div class="pomo-controls">
         <button class="btn primary" id="pomoToggle">시작</button>
+        ${pomo.mode==='focus'?`<button class="btn ok" id="pomoDone">완료</button>`:''}
         <button class="btn" id="pomoReset">초기화</button>
         <button class="btn" id="pomoSkip">건너뛰기</button>
       </div>
+      ${pipSupported()?`<button class="btn ghost" id="pomoPip">${svgIco('clock')} 작은 창으로 띄우기</button>`:''}
       <div class="pomo-task">
         <div style="font-size:13px;color:var(--muted);font-weight:600">${svgIco('target')} 집중할 할 일</div>
         <select id="pomoTask"><option value="">— 선택 안 함 —</option>${opts}</select>
@@ -1482,6 +1485,8 @@
     wrap.querySelectorAll('.pomo-modes button').forEach(b=>b.onclick=()=>switchMode(b.dataset.m,true));
     wrap.querySelector('#pomoToggle').onclick=togglePomo;
     wrap.querySelector('#pomoReset').onclick=()=>{ stopTick(); pomo.running=false; pomo.remaining=pomoLen(pomo.mode); paintPomo(); };
+    const doneBtn=wrap.querySelector('#pomoDone'); if(doneBtn) doneBtn.onclick=finishEarly;
+    const pipBtn=wrap.querySelector('#pomoPip'); if(pipBtn) pipBtn.onclick=openPomoPip;
     wrap.querySelector('#pomoSkip').onclick=()=>completePhase(false);
     wrap.querySelector('#pomoTask').onchange=e=>pomo.taskId=e.target.value;
     ['focus','short','long','every'].forEach(k=>{
@@ -1506,17 +1511,27 @@
   }
   function startTick(){
     stopTick();
-    pomo.interval=setInterval(()=>{
-      pomo.remaining--;
-      if(pomo.remaining<=0){ completePhase(true); }
-      else paintPomo();
-    },1000);
+    pomo.endAt = Date.now() + pomo.remaining*1000; // 감산이 아니라 만료 시각 기준 — 백그라운드 스로틀과 무관
+    pomo.interval=setInterval(tickPomo, 500);      // 표시 갱신용. 정확도는 endAt이 책임진다
+    keepAwake(true);
   }
-  function stopTick(){ if(pomo.interval){ clearInterval(pomo.interval); pomo.interval=null; } }
-  function completePhase(natural){
+  // 남은 시간을 시계로 다시 계산한다. 창을 내렸다 올리면(가시성 복귀) 이 함수가 즉시 따라잡는다.
+  function tickPomo(){
+    if(!pomo.running || !pomo.endAt) return;
+    const left=Math.ceil((pomo.endAt-Date.now())/1000);
+    if(left<=0){ pomo.remaining=0; completePhase(true); return; }
+    if(left!==pomo.remaining){ pomo.remaining=left; paintPomo(); }
+  }
+  function stopTick(){
+    if(pomo.interval){ clearInterval(pomo.interval); pomo.interval=null; }
+    pomo.endAt=null; keepAwake(false);
+  }
+  // natural=시간을 다 채움(소리·알림), earlyMin=사용자가 일찍 '완료'를 눌러 기록할 실제 집중 분
+  function completePhase(natural, earlyMin){
     stopTick();
+    const early = earlyMin!=null;
     if(pomo.mode==='focus'){
-      if(natural){ logSession(); pomo.cycle++; beep(2); }
+      if(natural||early){ logSession(early?earlyMin:state.settings.focus); pomo.cycle++; beep(2); }
       const longTime = pomo.cycle>0 && pomo.cycle % state.settings.longEvery===0;
       pomo.mode = longTime?'long':'short';
     } else {
@@ -1526,19 +1541,29 @@
     pomo.remaining=pomoLen(pomo.mode);
     pomo.running=false;
     if(currentView==='pomodoro') renderPomodoro(); else paintPomo();
-    if(natural && pomo.mode!=='focus') toast('집중 완료! 잠시 휴식하세요.');
+    if(early) toast(`${earlyMin}분 집중으로 기록했습니다.`);
+    else if(natural && pomo.mode!=='focus') toast('집중 완료! 잠시 휴식하세요.');
     if(natural && notifyEnabled()){
       if(pomo.mode!=='focus') showNotify('🍅 집중 완료','잠시 휴식하세요.','teum-pomo');
       else showNotify('☕ 휴식 끝','다시 집중해볼까요?','teum-pomo');
     }
   }
-  function logSession(){
-    state.sessions.push({id:uid(),taskId:pomo.taskId||'',date:todayStr(),duration:state.settings.focus,at:Date.now()});
+  // 일찍 끝냈을 때 — 남은 시간을 버리고 '실제로 집중한 만큼'만 기록한다(예상 시간을 부풀리지 않는다).
+  function finishEarly(){
+    if(pomo.mode!=='focus') return;
+    const elapsed=Math.max(0, pomoLen('focus')-pomo.remaining);
+    if(elapsed<=0) return; // 시작도 안 한 세션은 기록할 것이 없다(버튼도 비활성)
+    completePhase(false, Math.max(1, Math.round(elapsed/60)));
+  }
+  function logSession(min){
+    state.sessions.push({id:uid(),taskId:pomo.taskId||'',date:todayStr(),duration:min||state.settings.focus,at:Date.now()});
     save();
   }
   function paintPomo(){
     const mini=$('#pomoMini'), miniT=$('#pomoMiniTime');
     if(mini){ mini.style.display=pomo.running?'inline-flex':'none'; if(miniT) miniT.textContent=fmtClock(pomo.remaining); }
+    const doneBtn=$('#pomoDone'); if(doneBtn) doneBtn.disabled = pomo.remaining>=pomoLen('focus'); // 아직 1초도 안 지났으면 기록할 것이 없다
+    paintTitle(); paintPip();
     if(currentView!=='pomodoro') return;
     const tEl=$('#pomoTime'); if(!tEl) return;
     tEl.textContent=fmtClock(pomo.remaining);
@@ -1551,6 +1576,67 @@
     $('#pomoMini') && ($('#pomoMini').style.display=pomo.running?'inline-flex':'none');
   }
   function fmtClock(sec){ sec=Math.max(0,sec); return `${pad(Math.floor(sec/60))}:${pad(sec%60)}`; }
+  function pomoLabel(){ return pomo.mode==='focus'?'집중':(pomo.mode==='short'?'짧은 휴식':'긴 휴식'); }
+  // 창을 내려도 남은 시간이 보이게 — ① 탭 제목(모든 브라우저) ② 항상 위에 뜨는 작은 창(PiP, Chrome·Edge)
+  const BASE_TITLE=document.title;
+  function paintTitle(){ document.title = pomo.running ? `${fmtClock(pomo.remaining)} ${pomoLabel()} · 틈` : BASE_TITLE; }
+  function pipSupported(){ return typeof window!=='undefined' && 'documentPictureInPicture' in window; }
+  const PIP_CSS=`:root{color-scheme:light dark}
+    body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#fff;color:#102334;cursor:default}
+    .t{font-size:44px;font-weight:800;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;line-height:1}
+    .s{font-size:12px;opacity:.6}
+    .t.brk{color:#0d9488}
+    @media (prefers-color-scheme:dark){body{background:#0e1720;color:#e8eef4}}`;
+  async function openPomoPip(){
+    if(!pipSupported()) return;
+    if(pomo.pipWin && !pomo.pipWin.closed){ return; }
+    try{
+      // 사용자 제스처가 있어야 열 수 있다(브라우저 규칙). 그래서 '창을 내리면 자동으로'는 불가능하고 버튼으로 연다.
+      const w=await window.documentPictureInPicture.requestWindow({width:200,height:110});
+      const st=w.document.createElement('style'); st.textContent=PIP_CSS; w.document.head.appendChild(st);
+      const box=w.document.createElement('div');
+      box.innerHTML='<div class="t" id="pipTime">00:00</div><div class="s" id="pipState"></div>';
+      box.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px';
+      w.document.body.appendChild(box);
+      pomo.pipWin=w;
+      w.addEventListener('pagehide',()=>{ pomo.pipWin=null; });
+      paintPip();
+    }catch(err){ console.warn('작은 창 열기 실패',err); }
+  }
+  function paintPip(){
+    const w=pomo.pipWin; if(!w || w.closed) return;
+    try{
+      const t=w.document.getElementById('pipTime'), st=w.document.getElementById('pipState');
+      if(t){ t.textContent=fmtClock(pomo.remaining); t.classList.toggle('brk', pomo.mode!=='focus'); }
+      if(st) st.textContent = pomo.running?pomoLabel():(pomoLabel()+' 정지');
+    }catch(_){ pomo.pipWin=null; }
+  }
+  // 백그라운드 스로틀 회피 — 창을 내리면 브라우저가 타이머를 분당 1회까지 늦춘다. 경과 시간은 endAt으로
+  // 정확하지만 종료 알림이 늦는다. 들리지 않을 만큼 작은 소리(40Hz)를 내면 '재생 중' 페이지로 분류돼 예외가 된다.
+  // iOS는 제외한다. 창 최소화 개념이 없고, 재생을 시작하면 듣고 있던 음악을 끊을 수 있다.
+  let keepCtx=null, keepOsc=null;
+  function keepAwake(on){
+    try{
+      if(on){
+        if(keepCtx || isIOS()) return;
+        const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+        keepCtx=new AC();
+        const o=keepCtx.createOscillator(), g=keepCtx.createGain();
+        o.type='sine'; o.frequency.value=40; g.gain.value=0.003; // 사람 귀에 안 들리는 저역·저출력
+        o.connect(g); g.connect(keepCtx.destination); o.start();
+        keepOsc=o;
+        if(keepCtx.state==='suspended') keepCtx.resume();
+      }else{
+        if(keepOsc){ try{ keepOsc.stop(); }catch(_){} keepOsc=null; }
+        if(keepCtx){ try{ keepCtx.close(); }catch(_){} keepCtx=null; }
+      }
+    }catch(_){ /* 오디오 불가 환경은 무시 — 시간 계산은 endAt이 하므로 영향 없다 */ }
+  }
+  // 창을 다시 열거나 탭으로 돌아오면 즉시 따라잡는다(스로틀로 밀린 만큼 한 번에 보정).
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') tickPomo(); });
+  window.addEventListener('focus', tickPomo);
+  if(typeof window!=='undefined'){ window.__pomo=pomo; window.__pomoTick=tickPomo; } // 테스트 훅(타이머는 시계 의존이라 상태를 직접 고정)
   function beep(times){
     try{
       const ctx=new (window.AudioContext||window.webkitAudioContext)();

@@ -417,7 +417,10 @@ input,textarea,select{font-family:inherit}
 .pomo-dial svg{position:absolute;inset:0;transform:rotate(-90deg)}
 .pomo-time{font-size:60px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums}
 .pomo-state{font-size:13px;color:var(--muted);margin-top:2px}
-.pomo-controls{display:flex;gap:10px}
+.pomo-controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.btn.ok{border-color:var(--green);color:var(--green)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:hover{background:var(--panel)}
 .pomo-controls .btn{padding:12px 26px;font-size:16px}
 .pomo-task{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .pomo-task select{width:100%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:10px;padding:10px;font-size:14px;margin-top:8px}

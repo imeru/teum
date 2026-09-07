@@ -1697,6 +1697,62 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('양쪽 규칙 있으면 newer 승', MS(withRules, other).settings.autoRules[0].kw === '다른');
 }
 
+// ───────────────────────── 뽀모도로: 백그라운드 정확도 + 조기 완료 ─────────────────────────
+{
+  section('뽀모도로 타이머');
+  const { window: w, $, $$, getErr } = boot(baseState({}));
+  ck('런타임 에러 없음', !getErr());
+  const baseTitle = w.document.title;
+  $('.nav[data-view="pomodoro"]').click();
+  ck('PiP 미지원 환경엔 작은 창 버튼 없음', !$('#pomoPip'));
+  ck('시작 전 완료 버튼 비활성', $('#pomoDone') && $('#pomoDone').disabled);
+
+  $('#pomoToggle').click();
+  ck('시작하면 만료 시각이 잡힌다', typeof w.__pomo.endAt === 'number');
+  ck('진행 중 제목에 남은 시간', /집중/.test(w.document.title) && /\d\d:\d\d/.test(w.document.title));
+
+  // 창을 내려 setInterval이 밀린 상황: 시계상 만료됐으면 다음 tick 한 번으로 따라잡아야 한다
+  w.__pomo.endAt = Date.now() - 10;
+  w.__pomoTick();
+  const st = () => JSON.parse(w.localStorage.getItem('flowdo.state.v1'));
+  ck('밀린 만큼 한 번에 완료 처리', w.__pomo.running === false && w.__pomo.mode === 'short');
+  ck('세션 25분 기록', st().sessions.length === 1 && st().sessions[0].duration === 25);
+  ck('멈추면 제목 복원', w.document.title === baseTitle);
+  ck('휴식 모드엔 완료 버튼 없음', !$('#pomoDone'));
+  ck('사이클 증가', w.__pomo.cycle === 1);
+}
+{
+  section('뽀모도로 조기 완료');
+  const { window: w, $, getErr } = boot(baseState({}));
+  $('.nav[data-view="pomodoro"]').click();
+  $('#pomoToggle').click();
+  w.__pomo.endAt = Date.now() + (25 - 7) * 60 * 1000; // 7분 경과 지점
+  w.__pomoTick();
+  ck('경과가 생기면 완료 버튼 활성', !$('#pomoDone').disabled);
+  $('#pomoDone').click();
+  const st = JSON.parse(w.localStorage.getItem('flowdo.state.v1'));
+  ck('실제 집중한 7분만 기록', st.sessions.length === 1 && st.sessions[0].duration === 7);
+  ck('휴식으로 전환', w.__pomo.mode === 'short');
+  ck('타이머 정지·만료시각 해제', w.__pomo.running === false && w.__pomo.endAt === null);
+  ck('휴식 시간으로 리셋', w.__pomo.remaining === 5 * 60);
+  ck('런타임 에러 없음', !getErr());
+}
+{
+  section('뽀모도로 정지·복원');
+  const { window: w, $ } = boot(baseState({}));
+  $('.nav[data-view="pomodoro"]').click();
+  const baseTitle = w.document.title;
+  $('#pomoToggle').click();
+  $('#pomoToggle').click(); // 일시정지
+  ck('정지하면 만료시각 해제', w.__pomo.endAt === null);
+  ck('정지하면 제목 복원', w.document.title === baseTitle);
+  w.__pomo.remaining = 10 * 60;
+  $('#pomoReset').click();
+  const st = JSON.parse(w.localStorage.getItem('flowdo.state.v1'));
+  ck('초기화는 세션을 남기지 않음', !st.sessions.length);
+  ck('초기화 후 완료 버튼 비활성', $('#pomoDone').disabled);
+}
+
 // ───────────────────────── 결과 ─────────────────────────
 let ok = 0, fail = 0, lastSec = '';
 for (const [sec, name, pass] of results) {
