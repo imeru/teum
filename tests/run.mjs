@@ -293,7 +293,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     tasks: [
       { id: 'i1', title: '수집함일', status: 'inbox', priority: 4, tags: [], createdAt: 1, updatedAt: 1 },
       { id: 'n1', title: '다음행동일', status: 'next', priority: 2, due: todayDS, tags: [], createdAt: 2, updatedAt: 1 },
-      { id: 'w1', title: '대기일', status: 'waiting', priority: 3, tags: [], createdAt: 3, updatedAt: 1 },
+      { id: 'w1', title: '대기일', status: 'waiting', priority: 3, due: plusDays(2), tags: [], createdAt: 3, updatedAt: 1 },
       { id: 's1', title: '언젠가일', status: 'someday', priority: 4, tags: [], createdAt: 4, updatedAt: 1 },
       { id: 'dn', title: '완료일', status: 'done', completedAt: 1, priority: 4, tags: [], createdAt: 5, updatedAt: 1 },
     ]
@@ -305,6 +305,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('Inbox 열에 수집함일', cols[0].textContent.includes('수집함일'));
   ck('다음행동 열에 다음행동일', cols[1].textContent.includes('다음행동일'));
   ck('완료는 보드에 없음', !$('.gtdb').textContent.includes('완료일'));
+  // 원탭 '오늘 할 일로'는 다음 할일 열로 이동하고, 같은 버튼을 다시 누르면 원래 열과 마감일을 복원한다.
+  const waitingCard=[...$$('.gtdb-card')].find(c=>c.textContent.includes('대기일'));
+  const beforeDue=plusDays(2);
+  waitingCard.querySelector('.gc-today').click();
+  let stored=JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.find(t=>t.id==='w1');
+  ck('오늘 클릭 → due 오늘', stored.due===todayDS);
+  ck('오늘 클릭 → next 승격', stored.status==='next');
+  ck('오늘 클릭 → 이전 값 보존', stored._todayPrev && stored._todayPrev.due===beforeDue && stored._todayPrev.status==='waiting' && stored._todayPrev.setOn===todayDS);
+  const movedCard=[...$$('.gtdb-card')].find(c=>c.textContent.includes('대기일'));
+  const undoBtn=movedCard.querySelector('.gc-today');
+  ck('이동 후 같은 자리에 취소 버튼', undoBtn && undoBtn.getAttribute('aria-label')==='오늘 할 일 취소' && undoBtn.getAttribute('aria-pressed')==='true');
+  undoBtn.click();
+  stored=JSON.parse(localStorage.getItem('flowdo.state.v1')).tasks.find(t=>t.id==='w1');
+  ck('다시 클릭 → 원래 마감일 복원', stored.due===beforeDue);
+  ck('다시 클릭 → 원래 GTD 열 복원', stored.status==='waiting');
+  ck('복원 후 임시 값 제거', !stored._todayPrev);
+  const restoredCard=[...$$('.gtdb-card')].find(c=>c.textContent.includes('대기일'));
+  ck('복원 후 버튼은 오늘 할 일로', restoredCard.querySelector('.gc-today').getAttribute('aria-label')==='오늘 할 일로');
+  ck('기존부터 오늘인 일에는 취소 버튼 없음', ![...$$('.gtdb-card')].find(c=>c.textContent.includes('다음행동일')).querySelector('.gc-today'));
   // 빠른 추가 (Inbox 열)
   const inp = cols[0].querySelector('.gtdb-add input'); inp.value = '새수집';
   inp.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -1417,7 +1436,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   cardOf('대기일').querySelector('.gc-today').click();
   const st = JSON.parse(W.localStorage.getItem('flowdo.state.v1'));
   ck('탭 → 마감 오늘 + next 승격', st.tasks.find(x=>x.id==='w').due===todayDS && st.tasks.find(x=>x.id==='w').status==='next');
-  ck('처리 후 버튼 사라짐(오늘이므로)', !cardOf('대기일').querySelector('.gc-today'));
+  ck('처리 후 버튼은 취소 동작', cardOf('대기일').querySelector('.gc-today').getAttribute('aria-label')==='오늘 할 일 취소');
   ck('런타임 에러 없음(GTD 오늘)', !getErr());
 }
 

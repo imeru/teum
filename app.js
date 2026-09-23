@@ -81,6 +81,7 @@
       if(ev.excludeHolidays===undefined) ev.excludeHolidays=false;
     });
     (s.tasks||[]).forEach(t=>{ if(!Array.isArray(t.subtasks)) t.subtasks=[]; });
+    (s.tasks||[]).forEach(t=>{ if(t._todayPrev && (typeof t._todayPrev!=='object'||!('status' in t._todayPrev)||!('due' in t._todayPrev)||!t._todayPrev.setOn)) delete t._todayPrev; }); // '오늘 할 일' 취소용 이전 상태가 깨졌으면 폐기
     (s.tasks||[]).forEach(t=>{ if(t.weight!=='light'&&t.weight!=='focus') t.weight=null; }); // 에너지/집중도 가중치 정규화
     (s.tasks||[]).forEach(t=>{ if(t.repeat!=='daily'&&t.repeat!=='weekly'&&t.repeat!=='monthly') t.repeat=null; }); // 반복 주기 정규화
     if(!s.weekNotes) s.weekNotes={};
@@ -742,6 +743,18 @@
     {status:'waiting', title:'대기중 (위임)', ico:svgIco('waiting')},
     {status:'someday', title:'언젠가', ico:svgIco('someday')},
   ];
+  function todayUndoAvailable(t){ return !!(t._todayPrev && t._todayPrev.setOn===todayStr() && t.due===todayStr() && t.status==='next'); }
+  function moveTaskToday(t){
+    if(t.due===todayStr() && t.status==='next') return;
+    t._todayPrev={due:t.due||null,status:t.status||'next',completedAt:t.completedAt||null,setOn:todayStr()}; // 취소 시 기존 마감일과 GTD 열을 함께 복원
+    t.due=todayStr(); t.completedAt=null; t.status='next';
+  }
+  function undoMoveTaskToday(t){
+    if(!todayUndoAvailable(t)) return false;
+    const prev=t._todayPrev; t.due=prev.due||null; t.status=prev.status||'next'; t.completedAt=prev.completedAt||null; delete t._todayPrev;
+    return true;
+  }
+  function clearTodayUndoIfChanged(t,due,status){ if(t._todayPrev && (t.due!==due||t.status!==status)) delete t._todayPrev; }
   function gtdCard(t){
     const pc=t.priority<=3?`p${t.priority}`:'';
     const card=el(`<div class="gtdb-card ${isOverdue(t.due)?'overdue':''}" draggable="true">
@@ -756,12 +769,15 @@
     card.addEventListener('dragstart',e=>{dragOffsetMin=0;e.dataTransfer.setData('text/plain',t.id);card.classList.add('dragging');});
     card.addEventListener('dragend',()=>card.classList.remove('dragging'));
     card.querySelector('.gc-title').addEventListener('click',()=>openTask(t.id));
-    // 모바일(터치)엔 드래그가 없음 → 원탭 '오늘 할 일로' 버튼 (이미 오늘이면 숨김)
-    if(t.due!==todayStr()){
-      const b=el(`<button class="iconbtn gc-today" title="오늘 할 일로" aria-label="오늘 할 일로">${cic('today')}</button>`);
+    // 모바일(터치)엔 드래그가 없음 → 원탭으로 오늘 지정. 방금 옮긴 카드는 같은 자리에서 다시 눌러 복원한다.
+    const canUndoToday=todayUndoAvailable(t);
+    if(t.due!==todayStr() || canUndoToday){
+      const label=canUndoToday?'오늘 할 일 취소':'오늘 할 일로';
+      const b=el(`<button class="iconbtn gc-today ${canUndoToday?'on':''}" title="${label}" aria-label="${label}" aria-pressed="${canUndoToday?'true':'false'}">${cic(canUndoToday?'back':'today')}</button>`);
       b.onclick=e=>{ e.stopPropagation();
-        t.due=todayStr(); t.completedAt=null; if(t.status!=='next') t.status='next'; t.updatedAt=Date.now();
-        save(); renderGtdBoard(); renderSidebarCounts(); toast('오늘 할 일에 추가했어요');
+        const undone=undoMoveTaskToday(t); if(!undone) moveTaskToday(t); t.updatedAt=Date.now();
+        save(); renderGtdBoard(); renderSidebarCounts();
+        toast(undone?'오늘 할 일 지정을 취소했어요':'오늘 할 일에 추가했어요. 같은 버튼을 다시 누르면 취소됩니다.');
       };
       card.querySelector('.gc-title').appendChild(b);
     }
@@ -790,7 +806,7 @@
       c.addEventListener('dragleave',e=>{ if(e.target===c) c.classList.remove('gtdb-drop'); });
       c.addEventListener('drop',e=>{e.preventDefault();c.classList.remove('gtdb-drop');
         const id=e.dataTransfer.getData('text/plain'); const t=state.tasks.find(x=>x.id===id);
-        if(t && (t.status!==col.status || isDone(t))){ if(isDone(t)) t.completedAt=null; t.status=col.status; t.updatedAt=Date.now(); save(); renderGtdBoard(); renderSidebarCounts(); }
+        if(t && (t.status!==col.status || isDone(t))){ const due=t.due,status=t.status; if(isDone(t)) t.completedAt=null; t.status=col.status; clearTodayUndoIfChanged(t,due,status); t.updatedAt=Date.now(); save(); renderGtdBoard(); renderSidebarCounts(); }
       });
       board.appendChild(c);
     });
@@ -1931,7 +1947,7 @@
     const data={title,notes:$('#f-notes').value.trim(),status:$('#f-status').value,
       projectId:$('#f-project').value,due,dueTime:due?($('#f-duetime').value||null):null,repeat:$('#f-repeat').value||null,tags,priority:selectedPrio,weight:selectedWeight,
       estimate:(+$('#f-estimate').value||null),block,subtasks};
-    if(editingId){ const t=state.tasks.find(x=>x.id===editingId); Object.assign(t,data); t.updatedAt=Date.now(); }
+    if(editingId){ const t=state.tasks.find(x=>x.id===editingId); const due=t.due,status=t.status; Object.assign(t,data); clearTodayUndoIfChanged(t,due,status); t.updatedAt=Date.now(); }
     else { state.tasks.push({id:uid(),...data,createdAt:Date.now(),updatedAt:Date.now(),completedAt:null}); }
     save(); closeTask(); render();
   }
@@ -2106,7 +2122,7 @@
       if(t.due) meta.appendChild(el(`<span class="chip ${dueCls(t.due)}">${cic('cal')} ${fmtDue(t.due)}</span>`));
       if(t.projectId){ const p=state.projects.find(x=>x.id===t.projectId); if(p) meta.appendChild(el(`<span class="chip">${esc(p.name)}</span>`)); }
       card.querySelector('[data-a="focus"]').onclick=()=>startPomoForTask(t.id);
-      card.querySelector('[data-a="today"]').onclick=()=>{ t.due=todayStr(); t.completedAt=null; if(t.status!=='next') t.status='next'; t.updatedAt=Date.now(); save(); renderSuggest(); }; // '오늘로 보내기' 통일 규칙(due=오늘+next 승격)
+      card.querySelector('[data-a="today"]').onclick=()=>{ moveTaskToday(t); t.updatedAt=Date.now(); save(); renderSuggest(); }; // '오늘로 보내기' 통일 규칙(due=오늘+next 승격, GTD 보드에서 취소 가능)
       card.querySelector('[data-a="done"]').onclick=()=>{ toggleDone(t.id); renderSuggest(); };
       card.querySelector('.sg-title').onclick=()=>openTask(t.id);
       list.appendChild(card);
@@ -2894,7 +2910,7 @@
     elem.addEventListener('drop',e=>{
       e.preventDefault(); elem.classList.remove('nav-drop');
       const id=e.dataTransfer.getData('text/plain'); const t=state.tasks.find(x=>x.id===id);
-      if(t){ fn(t); t.updatedAt=Date.now(); save(); render(); }
+      if(t){ const due=t.due,status=t.status,todayPrev=t._todayPrev; fn(t); if(todayPrev&&t._todayPrev===todayPrev) clearTodayUndoIfChanged(t,due,status); t.updatedAt=Date.now(); save(); render(); }
     });
   }
 
@@ -2904,7 +2920,7 @@
 
   // ---------- Events ----------
   const navDropActions={
-    today:t=>{ t.due=todayStr(); t.completedAt=null; if(t.status!=='next') t.status='next'; }, // 오늘로 끌면 GTD '다음 할일'로 자동 승격(Inbox·대기·언젠가·완료 모두)
+    today:t=>moveTaskToday(t), // 오늘로 끌면 GTD '다음 할일'로 자동 승격, 보드에서 기존 마감일·열 복원 가능
     inbox:t=>{ t.status='inbox'; t.completedAt=null; },
     next:t=>{ t.status='next'; t.completedAt=null; },
     waiting:t=>{ t.status='waiting'; t.completedAt=null; },
